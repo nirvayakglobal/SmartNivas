@@ -16,6 +16,11 @@ import { ResidentDirectoryAndCsvImportPage } from "./sub_modules/society_admin_p
 import { GateAndSecurityGuardSetupPage } from "./sub_modules/society_admin_portal/GateAndSecurityGuardSetupPage";
 import { SocietyVisitorLogRegisterPage } from "./sub_modules/society_admin_portal/SocietyVisitorLogRegisterPage";
 import { SocietyDigitalNoticeBoardPage } from "./sub_modules/society_admin_portal/SocietyDigitalNoticeBoardPage";
+import { FinancialAndBillingManagementPage } from "./sub_modules/society_admin_portal/FinancialAndBillingManagementPage";
+import { ExpenseManagementAndAccountingPage } from "./sub_modules/society_admin_portal/ExpenseManagementAndAccountingPage";
+import { FinancialReportsPage } from "./sub_modules/society_admin_portal/FinancialReportsPage";
+import { HelpdeskAndComplaintManagementPage } from "./sub_modules/society_admin_portal/HelpdeskAndComplaintManagementPage";
+import { DailyStaffAndHelperManagementPage } from "./sub_modules/society_admin_portal/DailyStaffAndHelperManagementPage";
 import { SocietyAdminLoginPage } from "./sub_modules/society_admin_portal/SocietyAdminLoginPage";
 import { SocietyAdminBootstrapActivationPage } from "./sub_modules/society_admin_portal/SocietyAdminBootstrapActivationPage";
 import { UnifiedPortalLoginPage } from "./sub_modules/auth/UnifiedPortalLoginPage";
@@ -30,6 +35,10 @@ import {
   FileText,
   Megaphone,
   LayoutDashboard,
+  IndianRupee,
+  Receipt,
+  LifeBuoy,
+  UserCheck,
 } from "lucide-react";
 
 export function DesktopApplicationRouter() {
@@ -99,6 +108,31 @@ export function DesktopApplicationRouter() {
       targetPath: "/Society/Admin/visitor-logs",
       displayLabel: "Visitor Entry Register",
       iconComponent: FileText,
+    },
+    {
+      targetPath: "/Society/Admin/billing",
+      displayLabel: "Maintenance & Billing",
+      iconComponent: IndianRupee,
+    },
+    {
+      targetPath: "/Society/Admin/accounts-payable",
+      displayLabel: "Expense & Accounting",
+      iconComponent: Receipt,
+    },
+    {
+      targetPath: "/Society/Admin/reports",
+      displayLabel: "Financial Reports",
+      iconComponent: FileSpreadsheet,
+    },
+    {
+      targetPath: "/Society/Admin/helpdesk",
+      displayLabel: "Helpdesk & Complaints",
+      iconComponent: LifeBuoy,
+    },
+    {
+      targetPath: "/Society/Admin/staff",
+      displayLabel: "Daily Staff & Helpers",
+      iconComponent: UserCheck,
     },
   ];
 
@@ -223,6 +257,26 @@ export function DesktopApplicationRouter() {
               <Route
                 path="notices"
                 element={<SocietyDigitalNoticeBoardPage />}
+              />
+              <Route
+                path="billing"
+                element={<FinancialAndBillingManagementPage />}
+              />
+              <Route
+                path="accounts-payable"
+                element={<ExpenseManagementAndAccountingPage />}
+              />
+              <Route
+                path="reports"
+                element={<FinancialReportsPage />}
+              />
+              <Route
+                path="helpdesk"
+                element={<HelpdeskAndComplaintManagementPage />}
+              />
+              <Route
+                path="staff"
+                element={<DailyStaffAndHelperManagementPage />}
               />
               <Route path="*" element={<Navigate to="/Society/Admin/dashboard" replace />} />
             </Routes>

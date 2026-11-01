@@ -30,6 +30,18 @@ from backend_api.controllers.niravayak_central_crm_controller import (
 from backend_api.controllers.society_admin_portal_controller import (
     create_society_admin_portal_blueprint,
 )
+from backend_api.controllers.society_billing_controller import (
+    create_society_billing_blueprint,
+)
+from backend_api.controllers.society_accounts_payable_controller import (
+    create_society_accounts_payable_blueprint,
+)
+from backend_api.controllers.society_helpdesk_controller import (
+    create_society_helpdesk_blueprint,
+)
+from backend_api.controllers.society_daily_staff_controller import (
+    create_society_daily_staff_blueprint,
+)
 
 
 def create_smart_nivas_flask_application(
@@ -70,6 +82,30 @@ def create_smart_nivas_flask_application(
     flask_application.register_blueprint(
         society_admin_blueprint,
         url_prefix="/api/admin",
+    )
+
+    society_billing_blueprint = create_society_billing_blueprint()
+    flask_application.register_blueprint(
+        society_billing_blueprint,
+        url_prefix="/api/admin/billing",
+    )
+
+    society_accounts_payable_blueprint = create_society_accounts_payable_blueprint()
+    flask_application.register_blueprint(
+        society_accounts_payable_blueprint,
+        url_prefix="/api/admin/accounts-payable",
+    )
+
+    society_helpdesk_blueprint = create_society_helpdesk_blueprint()
+    flask_application.register_blueprint(
+        society_helpdesk_blueprint,
+        url_prefix="/api/admin/helpdesk",
+    )
+
+    society_daily_staff_blueprint = create_society_daily_staff_blueprint()
+    flask_application.register_blueprint(
+        society_daily_staff_blueprint,
+        url_prefix="/api/admin/staff",
     )
 
     # Global Health Check & API Metadata Endpoint
