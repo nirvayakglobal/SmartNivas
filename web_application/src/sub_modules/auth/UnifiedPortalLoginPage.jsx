@@ -34,8 +34,8 @@ export function UnifiedPortalLoginPage({
   const [errorMessage, setErrorMessage] = useState("");
   const navigationController = useNavigate();
 
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
+  const handleLoginSubmit = async (submitEvent) => {
+    submitEvent.preventDefault();
     setIsAuthenticating(true);
     setErrorMessage("");
 
@@ -96,9 +96,11 @@ export function UnifiedPortalLoginPage({
             <h1 className="text-xl font-bold tracking-tight text-slate-900 font-heading">
               {portalTitle}
             </h1>
-            <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mt-0.5">
-              {portalSubtitle}
-            </p>
+            {portalSubtitle ? (
+              <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mt-0.5">
+                {portalSubtitle}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -124,7 +126,7 @@ export function UnifiedPortalLoginPage({
                 type="text"
                 required
                 value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
+                onChange={(changeEvent) => setIdentifier(changeEvent.target.value)}
                 placeholder="Enter username or phone number"
                 className="block w-full pl-10 pr-4 py-2.5 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />
@@ -144,7 +146,7 @@ export function UnifiedPortalLoginPage({
                 type={showPassword ? "text" : "password"}
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(changeEvent) => setPassword(changeEvent.target.value)}
                 placeholder="Enter password"
                 className="block w-full pl-10 pr-11 py-2.5 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
               />

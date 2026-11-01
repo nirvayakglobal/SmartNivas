@@ -5,9 +5,9 @@ export function SocietyAdminLoginPage() {
   return (
     <UnifiedPortalLoginPage
       portalTitle="Society Admin Portal"
-      portalSubtitle="Society Managing Committee ERP"
+      portalSubtitle=""
       defaultIdentifier="9825000000"
-      defaultPassword="Admin@Patel2026!"
+      defaultPassword="Admin@Shilp2026!"
       targetRedirect="/Society/Admin/dashboard"
     />
   );

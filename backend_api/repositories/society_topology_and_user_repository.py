@@ -27,27 +27,39 @@ class SocietyTopologyAndUserRepository:
         society_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Finds user accounts matching phone number.
+        Finds user accounts matching phone number (handles 10-digit or leading zero variations).
         If society_id is provided, filters by that society or global accounts (society_id IS NULL).
         """
+        cleaned_phone_number: str = phone_number.strip()
+        alternate_phone_number: str = (
+            cleaned_phone_number.lstrip("0")
+            if cleaned_phone_number.startswith("0")
+            else "0" + cleaned_phone_number
+        )
+
         if society_id is not None:
             select_users_query: str = (
                 "SELECT user_id, society_id, flat_id, full_name, phone_number, "
                 "password_hash, user_role, resident_type, approval_status, "
                 "bootstrap_activation_token, is_bootstrap_pending, is_active "
                 "FROM users "
-                "WHERE phone_number = %s AND (society_id = %s OR society_id IS NULL)"
+                "WHERE (phone_number = %s OR phone_number = %s) AND (society_id = %s OR society_id IS NULL)"
             )
-            database_cursor.execute(select_users_query, (phone_number, society_id))
+            database_cursor.execute(
+                select_users_query,
+                (cleaned_phone_number, alternate_phone_number, society_id),
+            )
         else:
             select_users_query: str = (
                 "SELECT user_id, society_id, flat_id, full_name, phone_number, "
                 "password_hash, user_role, resident_type, approval_status, "
                 "bootstrap_activation_token, is_bootstrap_pending, is_active "
                 "FROM users "
-                "WHERE phone_number = %s"
+                "WHERE (phone_number = %s OR phone_number = %s)"
             )
-            database_cursor.execute(select_users_query, (phone_number,))
+            database_cursor.execute(
+                select_users_query, (cleaned_phone_number, alternate_phone_number)
+            )
 
         user_records: List[Dict[str, Any]] = database_cursor.fetchall()
         return user_records
