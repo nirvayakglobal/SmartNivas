@@ -252,6 +252,48 @@ class SocietyTopologyAndUserRepository:
         )
         return database_cursor.lastrowid
 
+    def find_flat_by_id(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+    ) -> Optional[Dict[str, Any]]:
+        select_flat_query: str = (
+            "SELECT flat_id, society_id, wing_id, flat_number, floor_number, occupancy_status "
+            "FROM flats WHERE flat_id = %s AND society_id = %s"
+        )
+        database_cursor.execute(select_flat_query, (flat_id, society_id))
+        return database_cursor.fetchone()
+
+    def update_flat_details(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+        flat_number: str,
+        floor_number: Optional[int],
+        occupancy_status: str,
+    ) -> None:
+        update_flat_query: str = (
+            "UPDATE flats SET flat_number = %s, floor_number = %s, occupancy_status = %s "
+            "WHERE flat_id = %s AND society_id = %s"
+        )
+        database_cursor.execute(
+            update_flat_query,
+            (flat_number, floor_number, occupancy_status, flat_id, society_id),
+        )
+
+    def delete_flat_by_id(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+    ) -> None:
+        delete_flat_query: str = (
+            "DELETE FROM flats WHERE flat_id = %s AND society_id = %s"
+        )
+        database_cursor.execute(delete_flat_query, (flat_id, society_id))
+
     # -------------------------------------------------------------------------
     # RESIDENTS DIRECTORY
     # -------------------------------------------------------------------------
@@ -304,6 +346,47 @@ class SocietyTopologyAndUserRepository:
             ),
         )
         return database_cursor.lastrowid
+
+    def update_resident_user(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        user_id: int,
+        full_name: str,
+        phone_number: str,
+        flat_id: int,
+        resident_type: str,
+        approval_status: str,
+    ) -> None:
+        update_user_query: str = (
+            "UPDATE users SET full_name = %s, phone_number = %s, flat_id = %s, "
+            "resident_type = %s, approval_status = %s "
+            "WHERE user_id = %s AND society_id = %s AND user_role = 'RESIDENT'"
+        )
+        database_cursor.execute(
+            update_user_query,
+            (
+                full_name,
+                phone_number,
+                flat_id,
+                resident_type,
+                approval_status,
+                user_id,
+                society_id,
+            ),
+        )
+
+    def delete_resident_user(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        user_id: int,
+    ) -> None:
+        delete_user_query: str = (
+            "DELETE FROM users "
+            "WHERE user_id = %s AND society_id = %s AND user_role = 'RESIDENT'"
+        )
+        database_cursor.execute(delete_user_query, (user_id, society_id))
 
     # -------------------------------------------------------------------------
     # GATES & SECURITY GUARDS SETUP
@@ -405,6 +488,89 @@ class SocietyTopologyAndUserRepository:
         )
         database_cursor.execute(select_logs_query, (society_id, limit_record_count))
         return database_cursor.fetchall()
+
+    def update_visitor_exit_timestamp(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        visit_log_id: int,
+    ) -> None:
+        update_exit_query: str = (
+            "UPDATE visit_logs SET exit_timestamp = CURRENT_TIMESTAMP "
+            "WHERE visit_log_id = %s AND society_id = %s AND exit_timestamp IS NULL"
+        )
+        database_cursor.execute(update_exit_query, (visit_log_id, society_id))
+
+    def get_society_dashboard_summary_metrics(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+    ) -> Dict[str, Any]:
+        """
+        Calculates high-level KPI counts for the society command center.
+        """
+        # Flats & Occupancy breakdown
+        flats_query: str = (
+            "SELECT "
+            "COUNT(*) AS total_flats_count, "
+            "SUM(CASE WHEN occupancy_status = 'OWNER_OCCUPIED' THEN 1 ELSE 0 END) AS owner_occupied_count, "
+            "SUM(CASE WHEN occupancy_status = 'TENANT_OCCUPIED' THEN 1 ELSE 0 END) AS tenant_occupied_count, "
+            "SUM(CASE WHEN occupancy_status = 'VACANT' THEN 1 ELSE 0 END) AS vacant_flats_count "
+            "FROM flats WHERE society_id = %s"
+        )
+        database_cursor.execute(flats_query, (society_id,))
+        flats_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Residents count
+        residents_query: str = (
+            "SELECT COUNT(*) AS total_residents_count FROM users "
+            "WHERE society_id = %s AND user_role = 'RESIDENT' AND is_active = TRUE"
+        )
+        database_cursor.execute(residents_query, (society_id,))
+        residents_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Guards count
+        guards_query: str = (
+            "SELECT COUNT(*) AS total_guards_count FROM users "
+            "WHERE society_id = %s AND user_role = 'GUARD' AND is_active = TRUE"
+        )
+        database_cursor.execute(guards_query, (society_id,))
+        guards_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Gates count
+        gates_query: str = (
+            "SELECT COUNT(*) AS total_gates_count FROM gates WHERE society_id = %s"
+        )
+        database_cursor.execute(gates_query, (society_id,))
+        gates_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Live visitors currently inside campus
+        active_visitors_query: str = (
+            "SELECT COUNT(*) AS active_campus_visitors_count FROM visit_logs "
+            "WHERE society_id = %s AND exit_timestamp IS NULL "
+            "AND approval_status IN ('APPROVED_ENTRY', 'INSIDE_CAMPUS')"
+        )
+        database_cursor.execute(active_visitors_query, (society_id,))
+        active_visitors_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Notices count
+        notices_query: str = (
+            "SELECT COUNT(*) AS total_notices_count FROM notices WHERE society_id = %s"
+        )
+        database_cursor.execute(notices_query, (society_id,))
+        notices_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        return {
+            "total_flats_count": int(flats_metrics.get("total_flats_count") or 0),
+            "owner_occupied_count": int(flats_metrics.get("owner_occupied_count") or 0),
+            "tenant_occupied_count": int(flats_metrics.get("tenant_occupied_count") or 0),
+            "vacant_flats_count": int(flats_metrics.get("vacant_flats_count") or 0),
+            "total_residents_count": int(residents_metrics.get("total_residents_count") or 0),
+            "total_guards_count": int(guards_metrics.get("total_guards_count") or 0),
+            "total_gates_count": int(gates_metrics.get("total_gates_count") or 0),
+            "active_campus_visitors_count": int(active_visitors_metrics.get("active_campus_visitors_count") or 0),
+            "total_notices_count": int(notices_metrics.get("total_notices_count") or 0),
+        }
 
     # -------------------------------------------------------------------------
     # DIGITAL NOTICE BOARD

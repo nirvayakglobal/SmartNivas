@@ -69,7 +69,7 @@ export function OnboardedSocietyClientsAndEntitlementsPage() {
     const activationToken = societyRecord.bootstrap_activation_token;
     if (!activationToken) return;
 
-    const fullActivationUrl = `${window.location.origin}/admin/activate?token=${activationToken}`;
+    const fullActivationUrl = `${window.location.origin}/Society/Admin/activate?token=${activationToken}`;
     navigator.clipboard.writeText(fullActivationUrl);
     setCopiedTokenSocietyId(societyRecord.society_id);
     setTimeout(() => setCopiedTokenSocietyId(null), 2500);
@@ -308,7 +308,7 @@ export function OnboardedSocietyClientsAndEntitlementsPage() {
             <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
               <h3 className="text-lg font-bold text-[#0F172A] font-heading flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-blue-600" />
-                Onboard New Society Client (ACID Multi-Step)
+                Onboard New Society Client
               </h3>
               <button
                 onClick={() => setIsOnboardingModalOpen(false)}
@@ -428,9 +428,9 @@ export function OnboardedSocietyClientsAndEntitlementsPage() {
               </div>
 
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
-                <p className="font-bold">Automated Multi-Step ACID Pipeline:</p>
+                <p className="font-bold">Automated Setup Pipeline:</p>
                 <p className="mt-0.5 text-blue-700">
-                  1. Inherits plan feature flags • 2. Generates root Society Admin with bootstrap activation link • 3. Creates initial GST invoice.
+                  1. Configures plan feature flags • 2. Generates root Society Admin with activation link • 3. Generates initial invoice.
                 </p>
               </div>
 

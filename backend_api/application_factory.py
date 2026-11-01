@@ -89,7 +89,19 @@ def create_smart_nivas_flask_application(
         )
 
     # Static file serving and SPA fallback for Desktop Web Application
-    # Routes: /central, /central/*, /admin, /admin/*
+    # Routes: /CRM, /CRM/*, /Society, /Society/*, and legacy /central, /admin
+    @flask_application.route("/CRM", defaults={"subpath": ""})
+    @flask_application.route("/CRM/", defaults={"subpath": ""})
+    @flask_application.route("/CRM/<path:subpath>")
+    @flask_application.route("/crm", defaults={"subpath": ""})
+    @flask_application.route("/crm/", defaults={"subpath": ""})
+    @flask_application.route("/crm/<path:subpath>")
+    @flask_application.route("/Society", defaults={"subpath": ""})
+    @flask_application.route("/Society/", defaults={"subpath": ""})
+    @flask_application.route("/Society/<path:subpath>")
+    @flask_application.route("/society", defaults={"subpath": ""})
+    @flask_application.route("/society/", defaults={"subpath": ""})
+    @flask_application.route("/society/<path:subpath>")
     @flask_application.route("/central", defaults={"subpath": ""})
     @flask_application.route("/central/", defaults={"subpath": ""})
     @flask_application.route("/central/<path:subpath>")
@@ -210,11 +222,16 @@ def create_smart_nivas_flask_application(
                 ),
                 404,
             )
+        # For non-API frontend routes, serve the web application bundle
+        if os.path.exists(web_application_distribution_directory):
+            return send_from_directory(
+                web_application_distribution_directory, "index.html"
+            )
         return (
             jsonify(
                 {
                     "platform": "Smart Nivas",
-                    "message": "Root entrypoint. Access /central, /admin, /guard, or /member.",
+                    "message": "Root entrypoint. Access /CRM/login or /Society/Admin/login.",
                 }
             ),
             200,

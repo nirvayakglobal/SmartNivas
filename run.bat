@@ -16,21 +16,19 @@ echo.
 echo [Step 2/2] Starting Smart Nivas Application Server...
 echo =====================================================================
 echo  Platform URLs:
-echo  - Niravayak Central CRM: http://localhost:5000/central/leads
-echo  - Central CRM Login:     http://localhost:5000/central/login
-echo  - Society Admin ERP:     http://localhost:5000/admin/topology
-echo  - Society Admin Login:   http://localhost:5000/admin/login
-echo  - API Health Check:      http://localhost:5000/api/health
+echo  - Niravayak Global CRM: http://localhost:5000/CRM/login
+echo  - Society Admin ERP:    http://localhost:5000/Society/Admin/login
+echo  - API Health Check:     http://localhost:5000/api/health
 echo.
 echo  Default Credentials (Seed Data):
 echo  - Super Admin Phone:     9999999999
 echo  - Super Admin Password:  SuperAdmin@Niravayak2026!
 echo =====================================================================
 echo.
-echo Opening browser at http://localhost:5000/central/leads ...
+echo Opening browser at http://localhost:5000/CRM/login ...
 echo.
 
-start "" "http://localhost:5000/central/leads"
+start "" "http://localhost:5000/CRM/login"
 
 python passenger_wsgi.py
 

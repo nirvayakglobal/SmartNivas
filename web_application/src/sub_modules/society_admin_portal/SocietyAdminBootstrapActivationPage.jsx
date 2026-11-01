@@ -48,7 +48,7 @@ export function SocietyAdminBootstrapActivationPage() {
           "smart_nivas_user_profile",
           JSON.stringify(responseJsonData.data.user)
         );
-        navigationController("/admin/topology");
+        navigationController("/Society/Admin/dashboard");
       } else {
         setErrorMessage(responseJsonData.message || "Activation failed.");
       }

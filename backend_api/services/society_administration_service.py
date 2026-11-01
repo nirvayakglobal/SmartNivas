@@ -156,6 +156,148 @@ class SocietyAdministrationService:
             summary_payload,
         )
 
+    def create_single_flat(
+        self,
+        society_id: int,
+        wing_name: str,
+        floor_number: int,
+        flat_number: str,
+        occupancy_status: str = "OWNER_OCCUPIED",
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Creates an individual flat in a wing. If the wing does not exist, it creates it.
+        Validates flat_number uniqueness within the wing.
+        """
+        cleaned_wing_name: str = wing_name.strip().upper()
+        cleaned_flat_number: str = flat_number.strip().upper()
+
+        if not cleaned_wing_name or not cleaned_flat_number:
+            raise ValueError("Wing name and flat number cannot be empty.")
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_wing: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_wing_by_name(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    wing_name=cleaned_wing_name,
+                )
+            )
+
+            if existing_wing:
+                active_wing_id: int = existing_wing["wing_id"]
+            else:
+                active_wing_id = self._topology_repository.insert_wing(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    wing_name=cleaned_wing_name,
+                )
+
+            conflicting_flat: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_flat_by_wing_and_number(
+                    database_cursor=database_cursor,
+                    wing_id=active_wing_id,
+                    flat_number=cleaned_flat_number,
+                )
+            )
+
+            if conflicting_flat:
+                raise ValueError(
+                    f"Flat '{cleaned_flat_number}' already exists in Wing '{cleaned_wing_name}'."
+                )
+
+            created_flat_id: int = self._topology_repository.insert_flat(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                wing_id=active_wing_id,
+                flat_number=cleaned_flat_number,
+                floor_number=floor_number,
+                occupancy_status=occupancy_status,
+            )
+
+        return (
+            True,
+            f"Flat '{cleaned_flat_number}' created successfully in Wing '{cleaned_wing_name}'.",
+            {"flat_id": created_flat_id},
+        )
+
+    def update_flat(
+        self,
+        society_id: int,
+        flat_id: int,
+        flat_number: str,
+        floor_number: int,
+        occupancy_status: str,
+    ) -> Tuple[bool, str]:
+        """
+        Updates flat number, floor number, or occupancy status.
+        Ensures flat exists and does not collide with another flat in the same wing.
+        """
+        cleaned_flat_number: str = flat_number.strip().upper()
+        if not cleaned_flat_number:
+            raise ValueError("Flat number cannot be empty.")
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_flat: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_flat_by_id(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    flat_id=flat_id,
+                )
+            )
+            if not existing_flat:
+                raise ValueError("Target flat not found.")
+
+            wing_id: int = existing_flat["wing_id"]
+            conflicting_flat: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_flat_by_wing_and_number(
+                    database_cursor=database_cursor,
+                    wing_id=wing_id,
+                    flat_number=cleaned_flat_number,
+                )
+            )
+            if conflicting_flat and conflicting_flat["flat_id"] != flat_id:
+                raise ValueError(
+                    f"Flat '{cleaned_flat_number}' already exists in this wing."
+                )
+
+            self._topology_repository.update_flat_details(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+                flat_number=cleaned_flat_number,
+                floor_number=floor_number,
+                occupancy_status=occupancy_status,
+            )
+
+        return True, f"Flat '{cleaned_flat_number}' updated successfully."
+
+    def delete_flat(
+        self,
+        society_id: int,
+        flat_id: int,
+    ) -> Tuple[bool, str]:
+        """
+        Safely deletes a flat from the society.
+        """
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_flat: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_flat_by_id(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    flat_id=flat_id,
+                )
+            )
+            if not existing_flat:
+                raise ValueError("Flat not found.")
+
+            self._topology_repository.delete_flat_by_id(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+            )
+
+        return True, "Flat deleted successfully."
+
     # -------------------------------------------------------------------------
     # RESIDENTS DIRECTORY & CSV BULK IMPORT (ACID TRANSACTION)
     # -------------------------------------------------------------------------
@@ -263,6 +405,91 @@ class SocietyAdministrationService:
             f"Successfully imported {imported_resident_records_count} residents atomically.",
             summary_payload,
         )
+
+    def update_resident(
+        self,
+        society_id: int,
+        user_id: int,
+        full_name: str,
+        phone_number: str,
+        wing_name: str,
+        flat_number: str,
+        resident_type: str,
+        approval_status: str,
+    ) -> Tuple[bool, str]:
+        """
+        Updates resident details and links them to their wing/flat.
+        """
+        cleaned_full_name: str = full_name.strip()
+        cleaned_phone_number: str = phone_number.strip()
+        cleaned_wing_name: str = wing_name.strip().upper()
+        cleaned_flat_number: str = flat_number.strip().upper()
+
+        if not cleaned_full_name or not cleaned_phone_number:
+            raise ValueError("Full name and phone number cannot be empty.")
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_user: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_user_by_id(
+                    database_cursor=database_cursor,
+                    user_id=user_id,
+                )
+            )
+            if not existing_user or existing_user["society_id"] != society_id:
+                raise ValueError("Target resident not found in this society.")
+
+            # Validate target flat exists
+            target_flat: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_flat_by_wing_name_and_flat_number(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    wing_name=cleaned_wing_name,
+                    flat_number=cleaned_flat_number,
+                )
+            )
+            if not target_flat:
+                raise ValueError(
+                    f"Flat '{cleaned_flat_number}' does not exist in Wing '{cleaned_wing_name}'."
+                )
+
+            self._topology_repository.update_resident_user(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                user_id=user_id,
+                full_name=cleaned_full_name,
+                phone_number=cleaned_phone_number,
+                flat_id=target_flat["flat_id"],
+                resident_type=resident_type,
+                approval_status=approval_status,
+            )
+
+        return True, f"Resident '{cleaned_full_name}' updated successfully."
+
+    def delete_resident(
+        self,
+        society_id: int,
+        user_id: int,
+    ) -> Tuple[bool, str]:
+        """
+        Deletes a resident user from the society directory.
+        """
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_user: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_user_by_id(
+                    database_cursor=database_cursor,
+                    user_id=user_id,
+                )
+            )
+            if not existing_user or existing_user["society_id"] != society_id:
+                raise ValueError("Target resident not found in this society.")
+
+            self._topology_repository.delete_resident_user(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                user_id=user_id,
+            )
+
+        return True, "Resident deleted successfully."
 
     # -------------------------------------------------------------------------
     # GATES & SECURITY GUARDS SETUP
@@ -400,3 +627,95 @@ class SocietyAdministrationService:
                 published_by_admin_user_id=admin_user_id,
             )
             return True, "Digital notice published successfully.", new_notice_id
+
+    def retrieve_society_dashboard_metrics(
+        self, society_id: int
+    ) -> Dict[str, Any]:
+        """
+        Retrieves live operational metrics for the Society Command Center.
+        """
+        with self._database_connection_manager.database_read_scope() as database_cursor:
+            return self._topology_repository.get_society_dashboard_summary_metrics(
+                database_cursor=database_cursor,
+                society_id=society_id,
+            )
+
+    def checkout_visitor(
+        self, society_id: int, visit_log_id: int
+    ) -> Tuple[bool, str]:
+        """
+        Records the checkout exit timestamp for an on-campus visitor.
+        """
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            self._topology_repository.update_visitor_exit_timestamp(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                visit_log_id=visit_log_id,
+            )
+        return True, "Visitor exit recorded successfully."
+
+    def create_single_resident(
+        self,
+        society_id: int,
+        wing_name: str,
+        flat_number: str,
+        full_name: str,
+        phone_number: str,
+        resident_type: str = "OWNER",
+    ) -> Tuple[bool, str, Optional[int]]:
+        """
+        Creates an individual resident record linked to an existing flat.
+        """
+        cleaned_wing_name: str = wing_name.strip().upper()
+        cleaned_flat_number: str = flat_number.strip().upper()
+        cleaned_full_name: str = full_name.strip()
+        cleaned_phone_number: str = phone_number.strip()
+
+        if not cleaned_full_name or not cleaned_phone_number:
+            return False, "Full name and phone number are required.", None
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            target_flat: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_flat_by_wing_name_and_flat_number(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    wing_name=cleaned_wing_name,
+                    flat_number=cleaned_flat_number,
+                )
+            )
+            if not target_flat:
+                return (
+                    False,
+                    f"Flat '{cleaned_flat_number}' in Wing '{cleaned_wing_name}' does not exist.",
+                    None,
+                )
+
+            # Check if phone number is already registered in this society
+            existing_residents: List[Dict[str, Any]] = (
+                self._topology_repository.find_user_by_phone_number_and_optional_society(
+                    database_cursor=database_cursor,
+                    phone_number=cleaned_phone_number,
+                    society_id=society_id,
+                )
+            )
+            if existing_residents:
+                return (
+                    False,
+                    f"A user with phone number '{cleaned_phone_number}' already exists in this society.",
+                    None,
+                )
+
+            default_password_hash: str = generate_password_hash(
+                "Resident@SmartNivas2026!", method="scrypt"
+            )
+            new_resident_id: int = self._topology_repository.insert_resident_user(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=target_flat["flat_id"],
+                full_name=cleaned_full_name,
+                phone_number=cleaned_phone_number,
+                password_hash=default_password_hash,
+                resident_type=resident_type.upper(),
+                approval_status="APPROVED",
+            )
+            return True, f"Resident '{cleaned_full_name}' added successfully.", new_resident_id

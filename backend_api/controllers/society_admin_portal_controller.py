@@ -111,6 +111,132 @@ def create_society_admin_portal_blueprint(
             201,
         )
 
+    @society_admin_blueprint.route("/topology/flats", methods=["POST"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_create_single_flat():
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        wing_name = str(request_payload.get("wing_name", "")).strip()
+        floor_number = int(request_payload.get("floor_number", 1))
+        flat_number = str(request_payload.get("flat_number", "")).strip()
+        occupancy_status = str(
+            request_payload.get("occupancy_status", "OWNER_OCCUPIED")
+        )
+
+        try:
+            is_successful, response_message, flat_data = (
+                admin_service.create_single_flat(
+                    society_id=authenticated_user.society_id,  # type: ignore
+                    wing_name=wing_name,
+                    floor_number=floor_number,
+                    flat_number=flat_number,
+                    occupancy_status=occupancy_status,
+                )
+            )
+            return (
+                jsonify(
+                    {
+                        "success": is_successful,
+                        "message": response_message,
+                        "data": flat_data,
+                    }
+                ),
+                201,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "INVALID_FLAT_PAYLOAD",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
+    @society_admin_blueprint.route("/topology/flats/<int:flat_id>", methods=["PATCH"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_update_flat(flat_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        flat_number = str(request_payload.get("flat_number", "")).strip()
+        floor_number = int(request_payload.get("floor_number", 1))
+        occupancy_status = str(
+            request_payload.get("occupancy_status", "OWNER_OCCUPIED")
+        )
+
+        try:
+            is_successful, response_message = admin_service.update_flat(
+                society_id=authenticated_user.society_id,  # type: ignore
+                flat_id=flat_id,
+                flat_number=flat_number,
+                floor_number=floor_number,
+                occupancy_status=occupancy_status,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": is_successful,
+                        "message": response_message,
+                    }
+                ),
+                200,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "UPDATE_FLAT_ERROR",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
+    @society_admin_blueprint.route("/topology/flats/<int:flat_id>", methods=["DELETE"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_delete_flat(flat_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        try:
+            is_successful, response_message = admin_service.delete_flat(
+                society_id=authenticated_user.society_id,  # type: ignore
+                flat_id=flat_id,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": is_successful,
+                        "message": response_message,
+                    }
+                ),
+                200,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "DELETE_FLAT_ERROR",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
     # -------------------------------------------------------------------------
     # RESIDENTS DIRECTORY & CSV IMPORT
     # -------------------------------------------------------------------------
@@ -177,6 +303,89 @@ def create_society_admin_portal_blueprint(
             ),
             200,
         )
+
+    @society_admin_blueprint.route("/residents/<int:resident_user_id>", methods=["PATCH"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_update_resident(resident_user_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        full_name = str(request_payload.get("full_name", "")).strip()
+        phone_number = str(request_payload.get("phone_number", "")).strip()
+        wing_name = str(request_payload.get("wing_name", "")).strip()
+        flat_number = str(request_payload.get("flat_number", "")).strip()
+        resident_type = str(request_payload.get("resident_type", "OWNER")).upper()
+        approval_status = str(
+            request_payload.get("approval_status", "APPROVED")
+        ).upper()
+
+        try:
+            is_successful, response_message = admin_service.update_resident(
+                society_id=authenticated_user.society_id,  # type: ignore
+                user_id=resident_user_id,
+                full_name=full_name,
+                phone_number=phone_number,
+                wing_name=wing_name,
+                flat_number=flat_number,
+                resident_type=resident_type,
+                approval_status=approval_status,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": is_successful,
+                        "message": response_message,
+                    }
+                ),
+                200,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "UPDATE_RESIDENT_ERROR",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
+    @society_admin_blueprint.route("/residents/<int:resident_user_id>", methods=["DELETE"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_delete_resident(resident_user_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        try:
+            is_successful, response_message = admin_service.delete_resident(
+                society_id=authenticated_user.society_id,  # type: ignore
+                user_id=resident_user_id,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": is_successful,
+                        "message": response_message,
+                    }
+                ),
+                200,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "DELETE_RESIDENT_ERROR",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
 
     # -------------------------------------------------------------------------
     # GATES & GUARDS SETUP
@@ -353,6 +562,77 @@ def create_society_admin_portal_blueprint(
                     "success": True,
                     "message": response_message,
                     "data": {"notice_id": new_notice_id},
+                }
+            ),
+            201,
+        )
+
+    # -------------------------------------------------------------------------
+    # DASHBOARD & COMMAND CENTER METRICS
+    # -------------------------------------------------------------------------
+
+    @society_admin_blueprint.route("/dashboard/metrics", methods=["GET"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_get_dashboard_metrics():
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        dashboard_metrics = admin_service.retrieve_society_dashboard_metrics(
+            society_id=authenticated_user.society_id  # type: ignore
+        )
+        return jsonify({"success": True, "data": dashboard_metrics}), 200
+
+    # -------------------------------------------------------------------------
+    # VISITOR CHECKOUT & RESIDENT SINGLE CREATION
+    # -------------------------------------------------------------------------
+
+    @society_admin_blueprint.route("/visitor-logs/<int:visit_log_id>/checkout", methods=["POST"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_checkout_visitor(visit_log_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        is_successful, response_message = admin_service.checkout_visitor(
+            society_id=authenticated_user.society_id,  # type: ignore
+            visit_log_id=visit_log_id,
+        )
+        return jsonify({"success": is_successful, "message": response_message}), 200
+
+    @society_admin_blueprint.route("/residents", methods=["POST"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_create_single_resident():
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        full_name = str(request_payload.get("full_name", "")).strip()
+        phone_number = str(request_payload.get("phone_number", "")).strip()
+        wing_name = str(request_payload.get("wing_name", "")).strip()
+        flat_number = str(request_payload.get("flat_number", "")).strip()
+        resident_type = str(request_payload.get("resident_type", "OWNER")).upper()
+
+        is_successful, response_message, new_resident_id = (
+            admin_service.create_single_resident(
+                society_id=authenticated_user.society_id,  # type: ignore
+                wing_name=wing_name,
+                flat_number=flat_number,
+                full_name=full_name,
+                phone_number=phone_number,
+                resident_type=resident_type,
+            )
+        )
+        if not is_successful:
+            return jsonify({"success": False, "message": response_message}), 400
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": response_message,
+                    "data": {"user_id": new_resident_id},
                 }
             ),
             201,

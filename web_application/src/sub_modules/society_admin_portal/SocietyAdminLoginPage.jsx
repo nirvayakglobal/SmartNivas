@@ -4,7 +4,6 @@ import { Building2, Lock, Phone, ArrowRight, ShieldCheck, KeyRound } from "lucid
 
 export function SocietyAdminLoginPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [societyCode, setSocietyCode] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -22,7 +21,6 @@ export function SocietyAdminLoginPage() {
         body: JSON.stringify({
           phone_number: phoneNumber,
           password: password,
-          society_code: societyCode.toUpperCase() || null,
         }),
       });
 
@@ -42,7 +40,7 @@ export function SocietyAdminLoginPage() {
             JSON.stringify(responseJsonData.data.society)
           );
         }
-        navigationController("/admin/topology");
+        navigationController("/Society/Admin/dashboard");
       } else {
         setErrorMessage(responseJsonData.message || "Invalid credentials.");
       }
@@ -77,30 +75,14 @@ export function SocietyAdminLoginPage() {
         <form onSubmit={handleLoginSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-semibold text-[#334155] uppercase block mb-1.5">
-              Society Unique Code (Optional if unique)
-            </label>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 text-[#94A3B8] absolute left-3 top-3" />
-              <input
-                type="text"
-                placeholder="e.g. SHALIGRAM"
-                value={societyCode}
-                onChange={(event) => setSocietyCode(event.target.value.toUpperCase())}
-                className="w-full bg-white border border-[#CBD5E1] rounded-sm pl-9 pr-3.5 py-2 text-sm text-[#0F172A] font-mono uppercase placeholder-[#94A3B8] focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#334155] uppercase block mb-1.5">
-              Admin Phone Number
+              Registered Phone Number
             </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-[#94A3B8] absolute left-3 top-3" />
               <input
                 type="tel"
                 required
-                placeholder="9825000000"
+                placeholder="e.g. 9825000000"
                 value={phoneNumber}
                 onChange={(event) => setPhoneNumber(event.target.value)}
                 className="w-full bg-white border border-[#CBD5E1] rounded-sm pl-9 pr-3.5 py-2 text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"

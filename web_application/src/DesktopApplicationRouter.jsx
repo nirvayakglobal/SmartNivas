@@ -10,6 +10,7 @@ import { B2bGstInvoicingAndRenewalsPage } from "./sub_modules/niravayak_central_
 import { CentralSuperAdminLoginPage } from "./sub_modules/niravayak_central_crm/CentralSuperAdminLoginPage";
 
 // Society Admin Portal Pages (Module 2)
+import { SocietyDashboardOverviewPage } from "./sub_modules/society_admin_portal/SocietyDashboardOverviewPage";
 import { WingAndFlatBulkGeneratorPage } from "./sub_modules/society_admin_portal/WingAndFlatBulkGeneratorPage";
 import { ResidentDirectoryAndCsvImportPage } from "./sub_modules/society_admin_portal/ResidentDirectoryAndCsvImportPage";
 import { GateAndSecurityGuardSetupPage } from "./sub_modules/society_admin_portal/GateAndSecurityGuardSetupPage";
@@ -27,27 +28,28 @@ import {
   ShieldCheck,
   FileText,
   Megaphone,
+  LayoutDashboard,
 } from "lucide-react";
 
 export function DesktopApplicationRouter() {
   const centralCrmNavigationItems = [
     {
-      targetPath: "/central/leads",
+      targetPath: "/CRM/leads",
       displayLabel: "Lead Pipeline",
       iconComponent: Users,
     },
     {
-      targetPath: "/central/clients",
+      targetPath: "/CRM/clients",
       displayLabel: "Society Clients & Flags",
       iconComponent: Building2,
     },
     {
-      targetPath: "/central/plans",
+      targetPath: "/CRM/plans",
       displayLabel: "Subscription Plans",
       iconComponent: CreditCard,
     },
     {
-      targetPath: "/central/invoices",
+      targetPath: "/CRM/invoices",
       displayLabel: "B2B GST Invoicing",
       iconComponent: FileSpreadsheet,
     },
@@ -73,22 +75,27 @@ export function DesktopApplicationRouter() {
 
   const societyAdminNavigationItems = [
     {
-      targetPath: "/admin/topology",
+      targetPath: "/Society/Admin/dashboard",
+      displayLabel: "Command Center",
+      iconComponent: LayoutDashboard,
+    },
+    {
+      targetPath: "/Society/Admin/topology",
       displayLabel: "Wings & Flat Generator",
       iconComponent: Layers,
     },
     {
-      targetPath: "/admin/residents",
+      targetPath: "/Society/Admin/residents",
       displayLabel: "Resident Directory & CSV",
       iconComponent: Users,
     },
     {
-      targetPath: "/admin/gates",
+      targetPath: "/Society/Admin/gates",
       displayLabel: "Gates & Guards Setup",
       iconComponent: ShieldCheck,
     },
     {
-      targetPath: "/admin/visitor-logs",
+      targetPath: "/Society/Admin/visitor-logs",
       displayLabel: "Visitor Entry Register",
       iconComponent: FileText,
     },
@@ -96,7 +103,7 @@ export function DesktopApplicationRouter() {
 
   if (isNoticeBoardEnabledForSociety) {
     societyAdminNavigationItems.push({
-      targetPath: "/admin/notices",
+      targetPath: "/Society/Admin/notices",
       displayLabel: "Digital Notice Board",
       iconComponent: Megaphone,
     });
@@ -104,24 +111,31 @@ export function DesktopApplicationRouter() {
 
   return (
     <Routes>
-      {/* Central Super Admin Login */}
-      <Route path="/central/login" element={<CentralSuperAdminLoginPage />} />
+      {/* Niravayak Global CRM Login */}
+      <Route path="/CRM/login" element={<CentralSuperAdminLoginPage />} />
 
-      {/* Society Admin Public Setup & Login */}
-      <Route path="/admin/login" element={<SocietyAdminLoginPage />} />
+      {/* Society Admin Login & Activation */}
+      <Route path="/Society/Admin/login" element={<SocietyAdminLoginPage />} />
       <Route
-        path="/admin/activate"
+        path="/Society/Admin/activate"
         element={<SocietyAdminBootstrapActivationPage />}
       />
 
-      {/* Central CRM Protected Portal Routes */}
+      {/* Legacy URL Backward-Compatibility Redirects */}
+      <Route path="/central/login" element={<Navigate to="/CRM/login" replace />} />
+      <Route path="/central/*" element={<Navigate to="/CRM/login" replace />} />
+      <Route path="/admin/login" element={<Navigate to="/Society/Admin/login" replace />} />
+      <Route path="/admin/*" element={<Navigate to="/Society/Admin/login" replace />} />
+
+      {/* Niravayak Global CRM Protected Portal Routes */}
       <Route
-        path="/central/*"
+        path="/CRM/*"
         element={
           <DesktopWebPortalLayout
-            portalTitle="Central B2B CRM & Licensing"
+            portalTitle="Niravayak Global CRM"
             portalSubtitle="Niravayak Global Super Administration"
             currentOperatorBadge="Niravayak Global HQ"
+            portalType="central"
             navigationItems={centralCrmNavigationItems}
           >
             <Routes>
@@ -138,24 +152,25 @@ export function DesktopApplicationRouter() {
                 path="invoices"
                 element={<B2bGstInvoicingAndRenewalsPage />}
               />
-              <Route path="*" element={<Navigate to="/central/leads" replace />} />
+              <Route path="*" element={<Navigate to="/CRM/login" replace />} />
             </Routes>
           </DesktopWebPortalLayout>
         }
       />
 
-      {/* Society Managing Committee ERP Routes */}
+      {/* Society Admin ERP Protected Portal Routes */}
       <Route
-        path="/admin/*"
+        path="/Society/Admin/*"
         element={
           <DesktopWebPortalLayout
-            portalTitle="Society Managing Committee ERP"
+            portalTitle="Society Admin ERP"
             portalSubtitle="Residential Housing Society Administration"
             currentOperatorBadge="Smart Nivas Tenant"
             portalType="admin"
             navigationItems={societyAdminNavigationItems}
           >
             <Routes>
+              <Route path="dashboard" element={<SocietyDashboardOverviewPage />} />
               <Route path="topology" element={<WingAndFlatBulkGeneratorPage />} />
               <Route
                 path="residents"
@@ -173,14 +188,14 @@ export function DesktopApplicationRouter() {
                 path="notices"
                 element={<SocietyDigitalNoticeBoardPage />}
               />
-              <Route path="*" element={<Navigate to="/admin/topology" replace />} />
+              <Route path="*" element={<Navigate to="/Society/Admin/dashboard" replace />} />
             </Routes>
           </DesktopWebPortalLayout>
         }
       />
 
-      {/* Root redirect */}
-      <Route path="*" element={<Navigate to="/central/leads" replace />} />
+      {/* Default root redirect to Niravayak Global CRM Login */}
+      <Route path="*" element={<Navigate to="/CRM/login" replace />} />
     </Routes>
   );
 }

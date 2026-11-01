@@ -34,7 +34,7 @@ export function CentralSuperAdminLoginPage() {
           "smart_nivas_user_profile",
           JSON.stringify(responseJsonData.data.user)
         );
-        navigationController("/central/leads");
+        navigationController("/CRM/leads");
       } else {
         setErrorMessage(responseJsonData.message || "Invalid credentials.");
       }
