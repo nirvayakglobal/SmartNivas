@@ -18,6 +18,7 @@ import { SocietyVisitorLogRegisterPage } from "./sub_modules/society_admin_porta
 import { SocietyDigitalNoticeBoardPage } from "./sub_modules/society_admin_portal/SocietyDigitalNoticeBoardPage";
 import { SocietyAdminLoginPage } from "./sub_modules/society_admin_portal/SocietyAdminLoginPage";
 import { SocietyAdminBootstrapActivationPage } from "./sub_modules/society_admin_portal/SocietyAdminBootstrapActivationPage";
+import { UnifiedPortalLoginPage } from "./sub_modules/auth/UnifiedPortalLoginPage";
 
 import {
   Users,
@@ -111,11 +112,46 @@ export function DesktopApplicationRouter() {
 
   return (
     <Routes>
-      {/* Niravayak Global CRM Login */}
+      {/* Dedicated Portal Logins (Identical UI/UX layout) */}
       <Route path="/CRM/login" element={<CentralSuperAdminLoginPage />} />
-
-      {/* Society Admin Login & Activation */}
       <Route path="/Society/Admin/login" element={<SocietyAdminLoginPage />} />
+      <Route
+        path="/member/login"
+        element={
+          <UnifiedPortalLoginPage
+            portalTitle="Resident Member Portal"
+            portalSubtitle="Housing Society Resident Access"
+            defaultIdentifier="9825100001"
+            defaultPassword="Member@Pass2026!"
+            targetRedirect="/Society/Admin/dashboard"
+          />
+        }
+      />
+      <Route
+        path="/resident/login"
+        element={
+          <UnifiedPortalLoginPage
+            portalTitle="Resident Member Portal"
+            portalSubtitle="Housing Society Resident Access"
+            defaultIdentifier="9825100001"
+            defaultPassword="Member@Pass2026!"
+            targetRedirect="/Society/Admin/dashboard"
+          />
+        }
+      />
+      <Route
+        path="/guard/login"
+        element={
+          <UnifiedPortalLoginPage
+            portalTitle="Security Guard Portal"
+            portalSubtitle="Gate & Visitor Check-In Access"
+            defaultIdentifier="9800000001"
+            defaultPassword="Guard@Gate2026!"
+            targetRedirect="/Society/Admin/visitor-logs"
+          />
+        }
+      />
+      <Route path="/login" element={<Navigate to="/Society/Admin/login" replace />} />
       <Route
         path="/Society/Admin/activate"
         element={<SocietyAdminBootstrapActivationPage />}

@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import {
-  Building2,
   LogOut,
   Shield,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+import brandMark from "../assets/smartnivas_mark.png";
 
 export function DesktopWebPortalLayout({
   portalTitle,
@@ -88,14 +88,22 @@ export function DesktopWebPortalLayout({
           <div className="h-16 min-h-[64px] max-h-[64px] px-4 border-b border-[#E2E8F0] flex items-center bg-white shrink-0">
             {isSidebarCollapsed ? (
               <div className="w-full flex items-center justify-center">
-                <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20 text-white shrink-0">
-                  <Building2 className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0">
+                  <img
+                    src={brandMark}
+                    alt="Smart Nivas"
+                    className="w-8 h-8 object-contain"
+                  />
                 </div>
               </div>
             ) : (
               <div className="flex items-center space-x-3 overflow-hidden">
-                <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20 text-white shrink-0">
-                  <Building2 className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0">
+                  <img
+                    src={brandMark}
+                    alt="Smart Nivas"
+                    className="w-9 h-9 object-contain"
+                  />
                 </div>
                 <div className="overflow-hidden">
                   <span className="font-bold text-base tracking-tight text-[#0F172A] font-heading block truncate leading-tight">

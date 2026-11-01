@@ -77,6 +77,16 @@ def initialize_smart_nivas_database() -> bool:
             autocommit=False,
         )
 
+        # Check if database already has tables initialized
+        with database_connection.cursor() as check_cursor:
+            check_cursor.execute("SHOW TABLES LIKE 'subscription_plans'")
+            existing_plan_table = check_cursor.fetchone()
+
+        if existing_plan_table:
+            print("[INFO] Database tables already exist. Skipping destructive table creation to preserve society and user data.")
+            database_connection.close()
+            return True
+
         schema_file_path: str = os.path.join(
             project_root_directory,
             "backend_api",

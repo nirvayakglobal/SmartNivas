@@ -208,7 +208,7 @@ def create_smart_nivas_flask_application(
             )
         return jsonify({"error": "manifest-resident-member.json not found"}), 404
 
-    # Global 404 handler for API routes
+    # Global 404 handler for API routes and root static files
     @flask_application.errorhandler(404)
     def handle_not_found_error(error_event):
         if request.path.startswith("/api/"):
@@ -222,8 +222,16 @@ def create_smart_nivas_flask_application(
                 ),
                 404,
             )
-        # For non-API frontend routes, serve the web application bundle
+        # Check if the requested file exists in web_application/dist (e.g. /smartnivas_login_logo.png, /favicon.png)
+        relative_path = request.path.lstrip("/")
         if os.path.exists(web_application_distribution_directory):
+            candidate_dist_file = os.path.join(
+                web_application_distribution_directory, relative_path
+            )
+            if relative_path and os.path.isfile(candidate_dist_file):
+                return send_from_directory(
+                    web_application_distribution_directory, relative_path
+                )
             return send_from_directory(
                 web_application_distribution_directory, "index.html"
             )
