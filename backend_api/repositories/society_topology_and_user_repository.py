@@ -473,6 +473,50 @@ class SocietyTopologyAndUserRepository:
         )
         return database_cursor.lastrowid
 
+    def update_guard_status(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        guard_user_id: int,
+        is_active: bool,
+    ) -> None:
+        update_query: str = (
+            "UPDATE users SET is_active = %s "
+            "WHERE user_id = %s AND society_id = %s AND user_role = 'GUARD'"
+        )
+        database_cursor.execute(
+            update_query,
+            (is_active, guard_user_id, society_id),
+        )
+
+    def update_guard_details(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        guard_user_id: int,
+        full_name: str,
+        phone_number: str,
+        password_hash: Optional[str] = None,
+    ) -> None:
+        if password_hash:
+            update_query = (
+                "UPDATE users SET full_name = %s, phone_number = %s, password_hash = %s "
+                "WHERE user_id = %s AND society_id = %s AND user_role = 'GUARD'"
+            )
+            database_cursor.execute(
+                update_query,
+                (full_name, phone_number, password_hash, guard_user_id, society_id),
+            )
+        else:
+            update_query = (
+                "UPDATE users SET full_name = %s, phone_number = %s "
+                "WHERE user_id = %s AND society_id = %s AND user_role = 'GUARD'"
+            )
+            database_cursor.execute(
+                update_query,
+                (full_name, phone_number, guard_user_id, society_id),
+            )
+
     # -------------------------------------------------------------------------
     # SOCIETY VISITOR LOGS REGISTER (AUDIT & SEARCH)
     # -------------------------------------------------------------------------

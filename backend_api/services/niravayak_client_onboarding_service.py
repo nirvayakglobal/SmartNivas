@@ -386,3 +386,264 @@ class NiravayakClientOnboardingService:
             if affected_rows == 0:
                 return False, "Invoice record not found."
             return True, "Invoice payment status updated successfully."
+
+    # -------------------------------------------------------------------------
+    # WING & FLAT TOPOLOGY PROVISIONING (COMMERCIAL SIZING)
+    # -------------------------------------------------------------------------
+
+    def retrieve_society_wings_and_flats(
+        self,
+        society_id: int,
+    ) -> Dict[str, Any]:
+        """
+        Retrieves wings and flats for the selected society in Central CRM.
+        """
+        with self._database_connection_manager.database_read_scope() as database_cursor:
+            wings_list = self._crm_repository.get_society_wings(
+                database_cursor=database_cursor,
+                society_id=society_id,
+            )
+            flats_list = self._crm_repository.get_society_flats(
+                database_cursor=database_cursor,
+                society_id=society_id,
+            )
+            return {
+                "society_id": society_id,
+                "wings": wings_list,
+                "flats": flats_list,
+                "total_flats_count": len(flats_list),
+                "total_wings_count": len(wings_list),
+            }
+
+    def bulk_provision_wings_and_flats(
+        self,
+        society_id: int,
+        wing_names_list: List[str],
+        start_floor_number: int,
+        end_floor_number: int,
+        flats_per_floor_count: int,
+        numbering_pattern: str = "FLOOR_PREFIX",
+        flat_type: str = "REGULAR",
+        super_builtup_area_sqft: float = 1000.0,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Atomic ACID bulk provisioning of wings and flats for a society from Central CRM.
+        Occupancy status defaults cleanly without resident assignment.
+        """
+        if not wing_names_list:
+            raise ValueError("At least one wing name must be provided.")
+        if start_floor_number > end_floor_number:
+            raise ValueError("Start floor cannot exceed end floor.")
+        if flats_per_floor_count < 1 or flats_per_floor_count > 20:
+            raise ValueError("Flats per floor must be between 1 and 20.")
+
+        total_wings_created_count = 0
+        total_flats_created_count = 0
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            # Ensure society exists
+            society_record = self._crm_repository.get_society_by_id(
+                database_cursor=database_cursor,
+                society_id=society_id,
+            )
+            if not society_record:
+                raise ValueError("Target society does not exist.")
+
+            for raw_wing_name in wing_names_list:
+                cleaned_wing_name = raw_wing_name.strip().upper()
+                if not cleaned_wing_name:
+                    continue
+
+                existing_wing = self._crm_repository.find_society_wing_by_name(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    wing_name=cleaned_wing_name,
+                )
+                if existing_wing:
+                    active_wing_id = existing_wing["wing_id"]
+                else:
+                    active_wing_id = self._crm_repository.insert_society_wing(
+                        database_cursor=database_cursor,
+                        society_id=society_id,
+                        wing_name=cleaned_wing_name,
+                    )
+                    total_wings_created_count += 1
+
+                for floor_index in range(start_floor_number, end_floor_number + 1):
+                    for unit_index in range(1, flats_per_floor_count + 1):
+                        if numbering_pattern == "FLOOR_PREFIX":
+                            flat_number_string = f"{floor_index}{unit_index:02d}"
+                        else:
+                            flat_number_string = f"{floor_index}-{unit_index}"
+
+                        conflicting_flat = (
+                            self._crm_repository.find_society_flat_by_wing_and_number(
+                                database_cursor=database_cursor,
+                                wing_id=active_wing_id,
+                                flat_number=flat_number_string,
+                            )
+                        )
+                        if conflicting_flat:
+                            raise ValueError(
+                                f"Flat '{flat_number_string}' already exists in Wing '{cleaned_wing_name}'. "
+                                f"Batch rolled back to prevent duplication."
+                            )
+
+                        self._crm_repository.insert_society_flat(
+                            database_cursor=database_cursor,
+                            society_id=society_id,
+                            wing_id=active_wing_id,
+                            flat_number=flat_number_string,
+                            floor_number=floor_index,
+                            flat_type=flat_type,
+                            super_builtup_area_sqft=super_builtup_area_sqft,
+                            occupancy_status="OWNER_OCCUPIED",
+                        )
+                        total_flats_created_count += 1
+
+        summary_payload = {
+            "society_id": society_id,
+            "wings_created_count": total_wings_created_count,
+            "flats_created_count": total_flats_created_count,
+        }
+        return (
+            True,
+            f"Successfully provisioned {total_flats_created_count} flats across {len(wing_names_list)} wings.",
+            summary_payload,
+        )
+
+    def provision_single_flat(
+        self,
+        society_id: int,
+        wing_name: str,
+        floor_number: int,
+        flat_number: str,
+        flat_type: str = "REGULAR",
+        super_builtup_area_sqft: float = 1000.0,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Creates a single flat under a society from Central CRM.
+        """
+        cleaned_wing_name = wing_name.strip().upper()
+        cleaned_flat_number = flat_number.strip().upper()
+        if not cleaned_wing_name or not cleaned_flat_number:
+            raise ValueError("Wing name and flat number are required.")
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_wing = self._crm_repository.find_society_wing_by_name(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                wing_name=cleaned_wing_name,
+            )
+            if existing_wing:
+                active_wing_id = existing_wing["wing_id"]
+            else:
+                active_wing_id = self._crm_repository.insert_society_wing(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    wing_name=cleaned_wing_name,
+                )
+
+            conflicting_flat = (
+                self._crm_repository.find_society_flat_by_wing_and_number(
+                    database_cursor=database_cursor,
+                    wing_id=active_wing_id,
+                    flat_number=cleaned_flat_number,
+                )
+            )
+            if conflicting_flat:
+                raise ValueError(
+                    f"Flat '{cleaned_flat_number}' already exists in Wing '{cleaned_wing_name}'."
+                )
+
+            created_flat_id = self._crm_repository.insert_society_flat(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                wing_id=active_wing_id,
+                flat_number=cleaned_flat_number,
+                floor_number=floor_number,
+                flat_type=flat_type,
+                super_builtup_area_sqft=super_builtup_area_sqft,
+                occupancy_status="OWNER_OCCUPIED",
+            )
+
+        return (
+            True,
+            f"Flat '{cleaned_flat_number}' provisioned in Wing '{cleaned_wing_name}'.",
+            {"flat_id": created_flat_id},
+        )
+
+    def modify_provisioned_flat(
+        self,
+        society_id: int,
+        flat_id: int,
+        flat_number: str,
+        floor_number: int,
+        flat_type: str = "REGULAR",
+        super_builtup_area_sqft: float = 1000.0,
+    ) -> Tuple[bool, str]:
+        """
+        Updates flat specifications from Central CRM.
+        """
+        cleaned_flat_number = flat_number.strip().upper()
+        if not cleaned_flat_number:
+            raise ValueError("Flat number cannot be empty.")
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_flat = self._crm_repository.find_society_flat_by_id(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+            )
+            if not existing_flat:
+                raise ValueError("Flat record not found.")
+
+            wing_id = existing_flat["wing_id"]
+            conflicting_flat = (
+                self._crm_repository.find_society_flat_by_wing_and_number(
+                    database_cursor=database_cursor,
+                    wing_id=wing_id,
+                    flat_number=cleaned_flat_number,
+                )
+            )
+            if conflicting_flat and conflicting_flat["flat_id"] != flat_id:
+                raise ValueError(
+                    f"Flat '{cleaned_flat_number}' already exists in this wing."
+                )
+
+            self._crm_repository.update_society_flat(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+                flat_number=cleaned_flat_number,
+                floor_number=floor_number,
+                flat_type=flat_type,
+                super_builtup_area_sqft=super_builtup_area_sqft,
+            )
+
+        return True, f"Flat '{cleaned_flat_number}' updated successfully."
+
+    def remove_provisioned_flat(
+        self,
+        society_id: int,
+        flat_id: int,
+    ) -> Tuple[bool, str]:
+        """
+        Removes a flat from society topology in Central CRM.
+        """
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_flat = self._crm_repository.find_society_flat_by_id(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+            )
+            if not existing_flat:
+                raise ValueError("Flat record not found.")
+
+            self._crm_repository.delete_society_flat(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+            )
+
+        return True, "Flat removed successfully."

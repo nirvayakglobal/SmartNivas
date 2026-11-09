@@ -382,4 +382,171 @@ def create_niravayak_central_crm_blueprint(
 
         return jsonify({"success": True, "message": response_message}), 200
 
+    # -------------------------------------------------------------------------
+    # WING & FLAT PROVISIONING ENDPOINTS (/api/central/provisioner/...)
+    # -------------------------------------------------------------------------
+
+    @central_crm_blueprint.route("/provisioner/societies/<int:society_id>/flats", methods=["GET"])
+    @require_super_admin
+    def handle_get_provisioned_flats_for_society(society_id: int):
+        topology_data = onboarding_service.retrieve_society_wings_and_flats(
+            society_id=society_id
+        )
+        return jsonify({"success": True, "data": topology_data}), 200
+
+    @central_crm_blueprint.route("/provisioner/societies/<int:society_id>/bulk-generate", methods=["POST"])
+    @require_super_admin
+    def handle_bulk_provision_flats(society_id: int):
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        wing_names = request_payload.get("wing_names", [])
+        start_floor_number = int(request_payload.get("start_floor_number", 1))
+        end_floor_number = int(request_payload.get("end_floor_number", 5))
+        flats_per_floor_count = int(request_payload.get("flats_per_floor_count", 4))
+        numbering_pattern = str(request_payload.get("numbering_pattern", "FLOOR_PREFIX"))
+        flat_type = str(request_payload.get("flat_type", "REGULAR"))
+        super_builtup_area_sqft = float(request_payload.get("super_builtup_area_sqft", 1000.0))
+
+        try:
+            is_successful, response_message, summary_data = (
+                onboarding_service.bulk_provision_wings_and_flats(
+                    society_id=society_id,
+                    wing_names_list=wing_names,
+                    start_floor_number=start_floor_number,
+                    end_floor_number=end_floor_number,
+                    flats_per_floor_count=flats_per_floor_count,
+                    numbering_pattern=numbering_pattern,
+                    flat_type=flat_type,
+                    super_builtup_area_sqft=super_builtup_area_sqft,
+                )
+            )
+            return (
+                jsonify(
+                    {
+                        "success": is_successful,
+                        "message": response_message,
+                        "data": summary_data,
+                    }
+                ),
+                201,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "PROVISIONING_FAILED",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
+    @central_crm_blueprint.route("/provisioner/societies/<int:society_id>/flats", methods=["POST"])
+    @require_super_admin
+    def handle_provision_single_flat(society_id: int):
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        wing_name = str(request_payload.get("wing_name", "")).strip()
+        floor_number = int(request_payload.get("floor_number", 1))
+        flat_number = str(request_payload.get("flat_number", "")).strip()
+        flat_type = str(request_payload.get("flat_type", "REGULAR"))
+        super_builtup_area_sqft = float(request_payload.get("super_builtup_area_sqft", 1000.0))
+
+        try:
+            is_successful, response_message, flat_data = (
+                onboarding_service.provision_single_flat(
+                    society_id=society_id,
+                    wing_name=wing_name,
+                    floor_number=floor_number,
+                    flat_number=flat_number,
+                    flat_type=flat_type,
+                    super_builtup_area_sqft=super_builtup_area_sqft,
+                )
+            )
+            return (
+                jsonify(
+                    {
+                        "success": is_successful,
+                        "message": response_message,
+                        "data": flat_data,
+                    }
+                ),
+                201,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "PROVISION_FLAT_FAILED",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
+    @central_crm_blueprint.route("/provisioner/societies/<int:society_id>/flats/<int:flat_id>", methods=["PATCH"])
+    @require_super_admin
+    def handle_modify_provisioned_flat(society_id: int, flat_id: int):
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        flat_number = str(request_payload.get("flat_number", "")).strip()
+        floor_number = int(request_payload.get("floor_number", 1))
+        flat_type = str(request_payload.get("flat_type", "REGULAR"))
+        super_builtup_area_sqft = float(request_payload.get("super_builtup_area_sqft", 1000.0))
+
+        try:
+            is_successful, response_message = (
+                onboarding_service.modify_provisioned_flat(
+                    society_id=society_id,
+                    flat_id=flat_id,
+                    flat_number=flat_number,
+                    floor_number=floor_number,
+                    flat_type=flat_type,
+                    super_builtup_area_sqft=super_builtup_area_sqft,
+                )
+            )
+            return jsonify({"success": is_successful, "message": response_message}), 200
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "MODIFY_FLAT_FAILED",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
+    @central_crm_blueprint.route("/provisioner/societies/<int:society_id>/flats/<int:flat_id>", methods=["DELETE"])
+    @require_super_admin
+    def handle_remove_provisioned_flat(society_id: int, flat_id: int):
+        try:
+            is_successful, response_message = (
+                onboarding_service.remove_provisioned_flat(
+                    society_id=society_id,
+                    flat_id=flat_id,
+                )
+            )
+            return jsonify({"success": is_successful, "message": response_message}), 200
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "DELETE_FLAT_FAILED",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
     return central_crm_blueprint

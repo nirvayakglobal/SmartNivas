@@ -24,8 +24,9 @@ class SocietyBillingRepository:
     ) -> Optional[Dict[str, Any]]:
         query = """
             SELECT
-                config_id, society_id, calculation_mode, fixed_monthly_rate_inr,
-                rate_per_sqft_inr, due_day_of_month, grace_period_days,
+                config_id, society_id, calculation_mode, billing_cycle,
+                fixed_monthly_rate_inr, rate_per_sqft_inr, flat_type_rates_json,
+                due_day_of_month, grace_period_days,
                 penalty_type, penalty_amount_or_rate, beneficiary_name,
                 bank_name, account_number, ifsc_code, upi_vpa,
                 enable_gst, gst_rate_percent, gst_exemption_limit_inr, society_gstin,
@@ -41,16 +42,18 @@ class SocietyBillingRepository:
     ) -> None:
         query = """
             INSERT INTO society_billing_configurations (
-                society_id, calculation_mode, fixed_monthly_rate_inr,
-                rate_per_sqft_inr, due_day_of_month, grace_period_days,
+                society_id, calculation_mode, billing_cycle, fixed_monthly_rate_inr,
+                rate_per_sqft_inr, flat_type_rates_json, due_day_of_month, grace_period_days,
                 penalty_type, penalty_amount_or_rate, beneficiary_name,
                 bank_name, account_number, ifsc_code, upi_vpa,
                 enable_gst, gst_rate_percent, gst_exemption_limit_inr, society_gstin
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 calculation_mode = VALUES(calculation_mode),
+                billing_cycle = VALUES(billing_cycle),
                 fixed_monthly_rate_inr = VALUES(fixed_monthly_rate_inr),
                 rate_per_sqft_inr = VALUES(rate_per_sqft_inr),
+                flat_type_rates_json = VALUES(flat_type_rates_json),
                 due_day_of_month = VALUES(due_day_of_month),
                 grace_period_days = VALUES(grace_period_days),
                 penalty_type = VALUES(penalty_type),
@@ -70,8 +73,10 @@ class SocietyBillingRepository:
             (
                 society_id,
                 config_data.get("calculation_mode", "FIXED_PER_FLAT"),
+                config_data.get("billing_cycle", "MONTHLY"),
                 config_data.get("fixed_monthly_rate_inr", 2000.00),
                 config_data.get("rate_per_sqft_inr", 2.50),
+                config_data.get("flat_type_rates_json"),
                 config_data.get("due_day_of_month", 10),
                 config_data.get("grace_period_days", 5),
                 config_data.get("penalty_type", "FLAT_FEE"),
@@ -176,7 +181,7 @@ class SocietyBillingRepository:
         query = """
             SELECT
                 f.flat_id, f.flat_number, f.floor_number, f.occupancy_status,
-                f.super_builtup_area_sqft, w.wing_name,
+                f.flat_type, f.super_builtup_area_sqft, w.wing_name,
                 (SELECT full_name FROM users u WHERE u.flat_id = f.flat_id AND u.is_active = 1 ORDER BY u.resident_type = 'OWNER' DESC LIMIT 1) AS resident_name,
                 (SELECT phone_number FROM users u WHERE u.flat_id = f.flat_id AND u.is_active = 1 ORDER BY u.resident_type = 'OWNER' DESC LIMIT 1) AS resident_phone
             FROM flats f
@@ -267,6 +272,7 @@ class SocietyBillingRepository:
                 w.wing_name,
                 f.super_builtup_area_sqft,
                 f.occupancy_status,
+                f.flat_type,
                 (SELECT full_name FROM users u WHERE u.flat_id = f.flat_id AND u.is_active = 1 ORDER BY u.resident_type = 'OWNER' DESC LIMIT 1) AS resident_name,
                 (SELECT phone_number FROM users u WHERE u.flat_id = f.flat_id AND u.is_active = 1 ORDER BY u.resident_type = 'OWNER' DESC LIMIT 1) AS resident_phone,
                 COALESCE(SUM(i.total_invoice_amount_inr), 0.00) AS total_billed_inr,
@@ -278,7 +284,7 @@ class SocietyBillingRepository:
             JOIN wings w ON f.wing_id = w.wing_id
             LEFT JOIN flat_invoices i ON f.flat_id = i.flat_id
             WHERE f.society_id = %s
-            GROUP BY f.flat_id, f.flat_number, w.wing_name, f.super_builtup_area_sqft, f.occupancy_status
+            GROUP BY f.flat_id, f.flat_number, w.wing_name, f.super_builtup_area_sqft, f.occupancy_status, f.flat_type
             ORDER BY w.wing_name ASC, f.flat_number ASC
         """
         database_cursor.execute(query, (society_id,))
@@ -650,4 +656,39 @@ class SocietyBillingRepository:
             "monthly_summary": monthly_tax_summary,
             "invoice_register": invoices_register,
         }
+
+    def update_flat_classification(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+        flat_type: str,
+        occupancy_status: str,
+    ) -> bool:
+        query = """
+            UPDATE flats
+            SET flat_type = %s, occupancy_status = %s
+            WHERE society_id = %s AND flat_id = %s
+        """
+        database_cursor.execute(query, (flat_type, occupancy_status, society_id, flat_id))
+        return database_cursor.rowcount > 0
+
+    def get_society_notice_details(
+        self, database_cursor: DictCursor, society_id: int
+    ) -> Dict[str, Any]:
+        query = """
+            SELECT
+                s.society_id, s.society_legal_name, s.registration_number,
+                s.billing_address, s.city_name, s.state_name,
+                s.rwa_contact_person_name, s.rwa_contact_phone_number,
+                c.calculation_mode, c.billing_cycle, c.fixed_monthly_rate_inr,
+                c.rate_per_sqft_inr, c.flat_type_rates_json, c.due_day_of_month,
+                c.grace_period_days, c.penalty_type, c.penalty_amount_or_rate,
+                c.beneficiary_name, c.bank_name, c.account_number, c.ifsc_code, c.upi_vpa
+            FROM societies s
+            LEFT JOIN society_billing_configurations c ON s.society_id = c.society_id
+            WHERE s.society_id = %s
+        """
+        database_cursor.execute(query, (society_id,))
+        return database_cursor.fetchone() or {}
 

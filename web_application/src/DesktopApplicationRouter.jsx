@@ -7,6 +7,7 @@ import { NiravayakLeadPipelinePage } from "./sub_modules/niravayak_central_crm/N
 import { OnboardedSocietyClientsAndEntitlementsPage } from "./sub_modules/niravayak_central_crm/OnboardedSocietyClientsAndEntitlementsPage";
 import { SubscriptionPlanMasterPage } from "./sub_modules/niravayak_central_crm/SubscriptionPlanMasterPage";
 import { B2bGstInvoicingAndRenewalsPage } from "./sub_modules/niravayak_central_crm/B2bGstInvoicingAndRenewalsPage";
+import { CentralWingAndFlatProvisionerPage } from "./sub_modules/niravayak_central_crm/CentralWingAndFlatProvisionerPage";
 import { CentralSuperAdminLoginPage } from "./sub_modules/niravayak_central_crm/CentralSuperAdminLoginPage";
 
 // Society Admin Portal Pages (Module 2)
@@ -52,6 +53,11 @@ export function DesktopApplicationRouter() {
       targetPath: "/CRM/clients",
       displayLabel: "Society Clients & Flags",
       iconComponent: Building2,
+    },
+    {
+      targetPath: "/CRM/provisioner",
+      displayLabel: "Wing & Flat Provisioner",
+      iconComponent: Layers,
     },
     {
       targetPath: "/CRM/plans",
@@ -213,6 +219,10 @@ export function DesktopApplicationRouter() {
               <Route
                 path="clients"
                 element={<OnboardedSocietyClientsAndEntitlementsPage />}
+              />
+              <Route
+                path="provisioner"
+                element={<CentralWingAndFlatProvisionerPage />}
               />
               <Route
                 path="plans"

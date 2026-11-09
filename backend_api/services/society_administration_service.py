@@ -585,6 +585,48 @@ class SocietyAdministrationService:
             )
             return True, "Security Guard account created successfully.", new_guard_user_id
 
+    def toggle_guard_active_status(
+        self,
+        society_id: int,
+        guard_user_id: int,
+        is_active: bool,
+    ) -> Tuple[bool, str]:
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            self._topology_repository.update_guard_status(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                guard_user_id=guard_user_id,
+                is_active=is_active,
+            )
+            action = "activated" if is_active else "inactivated"
+            return True, f"Security Guard has been {action} successfully."
+
+    def update_security_guard(
+        self,
+        society_id: int,
+        guard_user_id: int,
+        full_name: str,
+        phone_number: str,
+        four_digit_pin: Optional[str] = None,
+    ) -> Tuple[bool, str]:
+        cleaned_pin = four_digit_pin.strip() if four_digit_pin else None
+        password_hash = None
+        if cleaned_pin:
+            if len(cleaned_pin) != 4 or not cleaned_pin.isdigit():
+                return False, "Security guard passcode must be an exact 4-digit numeric PIN."
+            password_hash = generate_password_hash(cleaned_pin, method="scrypt")
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            self._topology_repository.update_guard_details(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                guard_user_id=guard_user_id,
+                full_name=full_name.strip(),
+                phone_number=phone_number.strip(),
+                password_hash=password_hash,
+            )
+            return True, "Security Guard updated successfully."
+
     # -------------------------------------------------------------------------
     # VISITOR LOGS REGISTER & DIGITAL NOTICE BOARD
     # -------------------------------------------------------------------------

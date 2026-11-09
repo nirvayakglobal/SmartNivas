@@ -540,3 +540,195 @@ class NiravayakCrmAndLicensingRepository:
         )
         database_cursor.execute(update_invoice_query, (payment_status, invoice_id))
         return database_cursor.rowcount
+
+    # -------------------------------------------------------------------------
+    # WING & FLAT TOPOLOGY PROVISIONING (COMMERCIAL INVENTORY SIZING)
+    # -------------------------------------------------------------------------
+
+    def get_society_wings(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieves all wings registered for a society.
+        """
+        select_wings_query: str = (
+            "SELECT wing_id, society_id, wing_name "
+            "FROM wings WHERE society_id = %s "
+            "ORDER BY wing_name ASC"
+        )
+        database_cursor.execute(select_wings_query, (society_id,))
+        wing_records: List[Dict[str, Any]] = database_cursor.fetchall()
+        return wing_records
+
+    def find_society_wing_by_name(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        wing_name: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Finds a wing by name within a specific society.
+        """
+        select_wing_query: str = (
+            "SELECT wing_id, society_id, wing_name "
+            "FROM wings WHERE society_id = %s AND wing_name = %s"
+        )
+        database_cursor.execute(select_wing_query, (society_id, wing_name))
+        wing_record: Optional[Dict[str, Any]] = database_cursor.fetchone()
+        return wing_record
+
+    def insert_society_wing(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        wing_name: str,
+    ) -> int:
+        """
+        Inserts a new wing for a society.
+        """
+        insert_wing_query: str = (
+            "INSERT INTO wings (society_id, wing_name) VALUES (%s, %s)"
+        )
+        database_cursor.execute(insert_wing_query, (society_id, wing_name))
+        return database_cursor.lastrowid
+
+    def get_society_flats(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieves all flat topology records for a society with wing names.
+        """
+        select_flats_query: str = (
+            "SELECT f.flat_id, f.society_id, f.wing_id, f.flat_number, "
+            "f.floor_number, f.flat_type, f.super_builtup_area_sqft, "
+            "f.occupancy_status, w.wing_name "
+            "FROM flats f "
+            "JOIN wings w ON f.wing_id = w.wing_id "
+            "WHERE f.society_id = %s "
+            "ORDER BY w.wing_name ASC, f.floor_number ASC, f.flat_number ASC"
+        )
+        database_cursor.execute(select_flats_query, (society_id,))
+        flat_records: List[Dict[str, Any]] = database_cursor.fetchall()
+        return flat_records
+
+    def find_society_flat_by_wing_and_number(
+        self,
+        database_cursor: DictCursor,
+        wing_id: int,
+        flat_number: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Checks collision for flat number in a wing.
+        """
+        select_flat_query: str = (
+            "SELECT flat_id, society_id, wing_id, flat_number, floor_number, flat_type "
+            "FROM flats WHERE wing_id = %s AND flat_number = %s"
+        )
+        database_cursor.execute(select_flat_query, (wing_id, flat_number))
+        flat_record: Optional[Dict[str, Any]] = database_cursor.fetchone()
+        return flat_record
+
+    def find_society_flat_by_id(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves a flat by flat_id scoped by society_id.
+        """
+        select_flat_query: str = (
+            "SELECT f.flat_id, f.society_id, f.wing_id, f.flat_number, "
+            "f.floor_number, f.flat_type, f.super_builtup_area_sqft, "
+            "f.occupancy_status, w.wing_name "
+            "FROM flats f "
+            "JOIN wings w ON f.wing_id = w.wing_id "
+            "WHERE f.society_id = %s AND f.flat_id = %s"
+        )
+        database_cursor.execute(select_flat_query, (society_id, flat_id))
+        flat_record: Optional[Dict[str, Any]] = database_cursor.fetchone()
+        return flat_record
+
+    def insert_society_flat(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        wing_id: int,
+        flat_number: str,
+        floor_number: int,
+        flat_type: str = "REGULAR",
+        super_builtup_area_sqft: float = 1000.0,
+        occupancy_status: str = "OWNER_OCCUPIED",
+    ) -> int:
+        """
+        Inserts a single flat record.
+        """
+        insert_flat_query: str = (
+            "INSERT INTO flats ("
+            "society_id, wing_id, flat_number, floor_number, flat_type, "
+            "super_builtup_area_sqft, occupancy_status"
+            ") VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        )
+        database_cursor.execute(
+            insert_flat_query,
+            (
+                society_id,
+                wing_id,
+                flat_number,
+                floor_number,
+                flat_type,
+                super_builtup_area_sqft,
+                occupancy_status,
+            ),
+        )
+        return database_cursor.lastrowid
+
+    def update_society_flat(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+        flat_number: str,
+        floor_number: int,
+        flat_type: str,
+        super_builtup_area_sqft: float,
+    ) -> int:
+        """
+        Updates flat specifications from Central CRM without altering resident occupancy.
+        """
+        update_flat_query: str = (
+            "UPDATE flats SET "
+            "flat_number = %s, floor_number = %s, flat_type = %s, super_builtup_area_sqft = %s "
+            "WHERE society_id = %s AND flat_id = %s"
+        )
+        database_cursor.execute(
+            update_flat_query,
+            (
+                flat_number,
+                floor_number,
+                flat_type,
+                super_builtup_area_sqft,
+                society_id,
+                flat_id,
+            ),
+        )
+        return database_cursor.rowcount
+
+    def delete_society_flat(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+    ) -> int:
+        """
+        Deletes a flat record from Central CRM provisioner.
+        """
+        delete_flat_query: str = (
+            "DELETE FROM flats WHERE society_id = %s AND flat_id = %s"
+        )
+        database_cursor.execute(delete_flat_query, (society_id, flat_id))
+        return database_cursor.rowcount

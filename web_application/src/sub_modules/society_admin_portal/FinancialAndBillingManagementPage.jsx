@@ -18,12 +18,18 @@ import {
   Clock,
   ChevronRight,
   FileText,
+  Printer,
+  Sparkles,
+  Building2,
+  Edit3,
 } from "lucide-react";
 
 import { BulkInvoiceGeneratorModal } from "./components/BulkInvoiceGeneratorModal";
 import { PaymentReconciliationDrawer } from "./components/PaymentReconciliationDrawer";
 import { BillingConfigurationModal } from "./components/BillingConfigurationModal";
 import { InvoiceUpiQrModal } from "./components/InvoiceUpiQrModal";
+import { MaintenanceNoticeCircularModal } from "./components/MaintenanceNoticeCircularModal";
+import { EditFlatClassificationModal } from "./components/EditFlatClassificationModal";
 
 export function FinancialAndBillingManagementPage() {
   const [dashboardSummary, setDashboardSummary] = useState(null);
@@ -33,13 +39,17 @@ export function FinancialAndBillingManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL"); // ALL | DEFAULTERS | CLEARED
+  const [filterType, setFilterType] = useState("ALL"); // ALL | REGULAR | PENTHOUSE | TENANTS
 
   // Modal / Drawer states
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isCircularModalOpen, setIsCircularModalOpen] = useState(false);
+  const [circularData, setCircularData] = useState(null);
   const [selectedFlatForPayment, setSelectedFlatForPayment] = useState(null);
   const [selectedInvoiceForQr, setSelectedInvoiceForQr] = useState(null);
+  const [flatToEdit, setFlatToEdit] = useState(null);
 
   // Flat statement timeline modal
   const [activeFlatStatement, setActiveFlatStatement] = useState(null);
@@ -77,6 +87,22 @@ export function FinancialAndBillingManagementPage() {
     }
   };
 
+  const handleOpenCircularModal = async () => {
+    try {
+      const token = localStorage.getItem("smart_nivas_auth_token");
+      const res = await fetch("/api/admin/billing/notice-circular", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCircularData(data.data);
+        setIsCircularModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Failed to load notice circular", err);
+    }
+  };
+
   useEffect(() => {
     fetchAllBillingData();
   }, []);
@@ -90,12 +116,19 @@ export function FinancialAndBillingManagementPage() {
 
     if (!matchesSearch) return false;
 
-    if (filterStatus === "DEFAULTERS") {
-      return parseFloat(flat.current_outstanding_inr || 0) > 0;
+    // Status filter
+    if (filterStatus === "DEFAULTERS" && parseFloat(flat.current_outstanding_inr || 0) <= 0) {
+      return false;
     }
-    if (filterStatus === "CLEARED") {
-      return parseFloat(flat.current_outstanding_inr || 0) <= 0;
+    if (filterStatus === "CLEARED" && parseFloat(flat.current_outstanding_inr || 0) > 0) {
+      return false;
     }
+
+    // Type filter
+    if (filterType === "PENTHOUSE" && flat.flat_type !== "PENTHOUSE") return false;
+    if (filterType === "REGULAR" && flat.flat_type !== "REGULAR") return false;
+    if (filterType === "TENANTS" && flat.occupancy_status !== "TENANT_OCCUPIED") return false;
+
     return true;
   });
 
@@ -123,22 +156,47 @@ export function FinancialAndBillingManagementPage() {
     }
   };
 
+  const handleFlatClassificationUpdated = (updatedFlat) => {
+    setFlatsLedger((prev) =>
+      prev.map((f) => (f.flat_id === updatedFlat.flat_id ? { ...f, ...updatedFlat } : f))
+    );
+  };
+
+  // Rates overview pill text
+  const isTiered = billingConfig?.calculation_mode === "TIERED_FLAT_TYPE";
+  const isQuarterly = billingConfig?.billing_cycle === "QUARTERLY";
+
   return (
-    <div className="space-y-6 antialiased pb-12">
+    <div className="space-y-6 antialiased pb-12 font-sans">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 font-heading tracking-tight flex items-center gap-2.5">
-            <IndianRupee className="w-6 h-6 text-blue-600" />
+          <h1 className="text-2xl font-black text-slate-900 font-heading tracking-tight flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-sm">
+              <IndianRupee className="w-5 h-5" />
+            </span>
             Financial & Maintenance Billing
           </h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Accounts receivable, dynamic maintenance calculation, flat ledgers & payment reconciliation.
+          <p className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-2">
+            <span>Accounts receivable ledger & tiered flat-wise maintenance calculations</span>
+            <span className="inline-block w-1 h-1 rounded-full bg-slate-300" />
+            <span className="font-semibold text-blue-600">
+              {isQuarterly ? "Quarterly Cycle" : "Monthly Cycle"}
+            </span>
           </p>
         </div>
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Official Notice Circular Preview Button */}
+          <button
+            onClick={handleOpenCircularModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-xs transition cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-slate-500" />
+            <span>Notice Circular (પરિપત્ર)</span>
+          </button>
+
           <button
             onClick={() => setIsConfigModalOpen(true)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition cursor-pointer"
@@ -154,7 +212,7 @@ export function FinancialAndBillingManagementPage() {
             }}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition cursor-pointer"
           >
-            <CreditCard className="w-4 h-4 text-blue-600" />
+            <CreditCard className="w-4 h-4 text-emerald-600" />
             <span>Record Payment</span>
           </button>
 
@@ -169,7 +227,46 @@ export function FinancialAndBillingManagementPage() {
       </div>
 
       {/* =========================================================================
-          SECTION 1: HIGH-LEVEL BILLING DASHBOARD KPIS & MONTHLY BAR CHART
+          ACTIVE TIERED RATE BANNER
+         ========================================================================= */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-md bg-blue-500/30 text-blue-200 border border-blue-400/30 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Active Pricing Engine
+            </span>
+            <span className="text-xs font-bold text-white">
+              {isTiered
+                ? `Flat-Type & Occupancy Matrix (${isQuarterly ? "Quarterly" : "Monthly"})`
+                : billingConfig?.calculation_mode === "PER_SQFT_AREA"
+                ? `₹${billingConfig?.rate_per_sqft_inr}/sq.ft. Area`
+                : `Uniform ₹${billingConfig?.fixed_monthly_rate_inr}/flat`}
+            </span>
+          </div>
+          <p className="text-xs text-blue-200/80">
+            Shilp Serenity Model: Regular Flats ₹{isQuarterly ? "7,200 (Owner) / ₹9,000 (Tenant)" : "2,400 (Owner) / ₹3,000 (Tenant)"} • Penthouses ₹{isQuarterly ? "8,700 (Owner) / ₹10,500 (Tenant)" : "2,900 (Owner) / ₹3,500 (Tenant)"} per quarter.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right">
+            <span className="text-[10px] text-blue-200 block uppercase font-bold tracking-wider">Late Payment Fine</span>
+            <span className="text-sm font-extrabold text-amber-300 font-mono">
+              ₹{billingConfig?.penalty_amount_or_rate || 500} / mo
+            </span>
+          </div>
+          <button
+            onClick={() => setIsConfigModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition cursor-pointer"
+          >
+            Modify Rates
+          </button>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          SECTION 1: DASHBOARD KPIS & MONTHLY BAR CHART
          ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: 3 KPI Cards */}
@@ -180,11 +277,11 @@ export function FinancialAndBillingManagementPage() {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Total Invoiced
               </p>
-              <h2 className="text-2xl font-extrabold text-slate-900 font-heading mt-1">
+              <h2 className="text-2xl font-black text-slate-900 font-heading mt-1">
                 ₹{(dashboardSummary?.total_billed_inr || 0).toLocaleString("en-IN")}
               </h2>
               <span className="text-[11px] text-slate-500 font-medium">
-                {dashboardSummary?.total_invoices_issued || 0} bills issued across all cycles
+                {dashboardSummary?.total_invoices_issued || 0} bills issued across cycles
               </span>
             </div>
             <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -198,7 +295,7 @@ export function FinancialAndBillingManagementPage() {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Collected Receipts
               </p>
-              <h2 className="text-2xl font-extrabold text-emerald-600 font-heading mt-1">
+              <h2 className="text-2xl font-black text-emerald-600 font-heading mt-1">
                 ₹{(dashboardSummary?.total_collected_inr || 0).toLocaleString("en-IN")}
               </h2>
               <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
@@ -217,7 +314,7 @@ export function FinancialAndBillingManagementPage() {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Outstanding Dues
               </p>
-              <h2 className="text-2xl font-extrabold text-rose-600 font-heading mt-1">
+              <h2 className="text-2xl font-black text-rose-600 font-heading mt-1">
                 ₹{(dashboardSummary?.total_outstanding_inr || 0).toLocaleString("en-IN")}
               </h2>
               <span className="text-[11px] text-rose-500 font-semibold flex items-center gap-1">
@@ -237,7 +334,7 @@ export function FinancialAndBillingManagementPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 font-heading">
-                  Monthly Financial Performance (Billed vs Collected)
+                  Financial Performance (Billed vs Collected)
                 </h3>
                 <p className="text-xs text-slate-400">
                   Real-time collection velocity across historical maintenance periods.
@@ -255,43 +352,40 @@ export function FinancialAndBillingManagementPage() {
               </div>
             </div>
 
-            {/* Bar Chart Visualization */}
+            {/* Visual Bar Chart */}
             {dashboardSummary?.monthly_trends && dashboardSummary.monthly_trends.length > 0 ? (
-              <div className="h-48 flex items-end justify-between gap-4 pt-6 px-2 border-b border-slate-100">
-                {dashboardSummary.monthly_trends.map((m) => {
-                  const maxAmt = Math.max(
-                    ...dashboardSummary.monthly_trends.map((item) =>
-                      Math.max(parseFloat(item.billed_amount), parseFloat(item.collected_amount))
+              <div className="h-52 flex items-end justify-between gap-3 pt-6 px-2">
+                {dashboardSummary.monthly_trends.map((item, idx) => {
+                  const maxVal = Math.max(
+                    ...dashboardSummary.monthly_trends.map((m) =>
+                      Math.max(m.billed_amount, m.collected_amount)
                     ),
-                    1000
+                    1
                   );
-                  const billedHeight = `${Math.min(100, (parseFloat(m.billed_amount) / maxAmt) * 100)}%`;
-                  const collectedHeight = `${Math.min(100, (parseFloat(m.collected_amount) / maxAmt) * 100)}%`;
+                  const billedHeight = Math.max((item.billed_amount / maxVal) * 100, 6);
+                  const collectedHeight = Math.max((item.collected_amount / maxVal) * 100, 4);
 
                   return (
-                    <div key={m.billing_period_month} className="flex-1 flex flex-col items-center h-full justify-end">
-                      <div className="w-full flex items-end justify-center gap-1.5 h-36">
+                    <div
+                      key={idx}
+                      className="flex-1 flex flex-col items-center gap-2 h-full justify-end group"
+                    >
+                      <div className="w-full flex items-end justify-center gap-1.5 h-40">
                         {/* Billed Bar */}
                         <div
-                          style={{ height: billedHeight }}
-                          className="w-1/3 bg-blue-600 rounded-t-md transition-all duration-300 relative group"
-                        >
-                          <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-0.5 px-1.5 rounded pointer-events-none whitespace-nowrap z-20">
-                            Billed: ₹{parseFloat(m.billed_amount).toLocaleString("en-IN")}
-                          </div>
-                        </div>
+                          style={{ height: `${billedHeight}%` }}
+                          className="w-1/2 max-w-[28px] bg-blue-600/80 group-hover:bg-blue-600 rounded-t-md transition-all relative"
+                          title={`Billed: ₹${item.billed_amount}`}
+                        />
                         {/* Collected Bar */}
                         <div
-                          style={{ height: collectedHeight }}
-                          className="w-1/3 bg-emerald-500 rounded-t-md transition-all duration-300 relative group"
-                        >
-                          <div className="opacity-0 group-hover:opacity-100 absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-0.5 px-1.5 rounded pointer-events-none whitespace-nowrap z-20">
-                            Paid: ₹{parseFloat(m.collected_amount).toLocaleString("en-IN")}
-                          </div>
-                        </div>
+                          style={{ height: `${collectedHeight}%` }}
+                          className="w-1/2 max-w-[28px] bg-emerald-500/80 group-hover:bg-emerald-500 rounded-t-md transition-all relative"
+                          title={`Collected: ₹${item.collected_amount}`}
+                        />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-500 mt-2 truncate max-w-[80px]">
-                        {m.billing_period_label.split(" ")[0]}
+                      <span className="text-[10px] font-semibold text-slate-500 truncate max-w-full">
+                        {item.billing_period_label.split(" ")[0]}
                       </span>
                     </div>
                   );
@@ -313,15 +407,11 @@ export function FinancialAndBillingManagementPage() {
 
           <div className="pt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 mt-2">
             <span>
-              Active Rule:{" "}
-              <strong className="text-slate-700">
-                {billingConfig?.calculation_mode === "PER_SQFT_AREA"
-                  ? `₹${billingConfig?.rate_per_sqft_inr}/sq.ft.`
-                  : `Fixed ₹${billingConfig?.fixed_monthly_rate_inr}/flat`}
-              </strong>
+              Society Due Date:{" "}
+              <strong className="text-slate-700">{billingConfig?.due_day_of_month || 10}th of period</strong> (+{billingConfig?.grace_period_days || 5} days grace)
             </span>
             <span>
-              Due Date: <strong className="text-slate-700">{billingConfig?.due_day_of_month || 10}th of month</strong> (+{billingConfig?.grace_period_days || 5} days grace)
+              Bank: <strong className="text-slate-700">{billingConfig?.bank_name || "Configured"}</strong> ({billingConfig?.upi_vpa || "UPI active"})
             </span>
           </div>
         </div>
@@ -337,7 +427,7 @@ export function FinancialAndBillingManagementPage() {
             <h3 className="text-sm font-bold text-slate-900 font-heading">
               Flat-by-Flat Accounts Receivable Ledger
             </h3>
-            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+            <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold font-mono">
               {filteredFlats.length} Flats
             </span>
           </div>
@@ -348,34 +438,70 @@ export function FinancialAndBillingManagementPage() {
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search flat, wing, resident..."
+                placeholder="Search flat, resident..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none w-48 sm:w-60"
+                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none w-44 sm:w-56"
               />
             </div>
 
-            {/* Filter Pill Tabs */}
+            {/* Type Filter Tabs */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+              <button
+                onClick={() => setFilterType("ALL")}
+                className={`px-2.5 py-1 rounded-lg transition ${
+                  filterType === "ALL" ? "bg-white text-blue-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                All Types
+              </button>
+              <button
+                onClick={() => setFilterType("REGULAR")}
+                className={`px-2.5 py-1 rounded-lg transition ${
+                  filterType === "REGULAR" ? "bg-white text-blue-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Regular
+              </button>
+              <button
+                onClick={() => setFilterType("PENTHOUSE")}
+                className={`px-2.5 py-1 rounded-lg transition ${
+                  filterType === "PENTHOUSE" ? "bg-white text-amber-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Penthouse
+              </button>
+              <button
+                onClick={() => setFilterType("TENANTS")}
+                className={`px-2.5 py-1 rounded-lg transition ${
+                  filterType === "TENANTS" ? "bg-white text-indigo-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Tenants
+              </button>
+            </div>
+
+            {/* Defaulter / Cleared Filter Tabs */}
             <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
               <button
                 onClick={() => setFilterStatus("ALL")}
-                className={`px-3 py-1 rounded-lg transition ${
-                  filterStatus === "ALL" ? "bg-white text-blue-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                className={`px-2.5 py-1 rounded-lg transition ${
+                  filterStatus === "ALL" ? "bg-white text-slate-800 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                All
+                All Dues
               </button>
               <button
                 onClick={() => setFilterStatus("DEFAULTERS")}
-                className={`px-3 py-1 rounded-lg transition ${
+                className={`px-2.5 py-1 rounded-lg transition ${
                   filterStatus === "DEFAULTERS" ? "bg-white text-rose-600 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                With Dues
+                Defaulters
               </button>
               <button
                 onClick={() => setFilterStatus("CLEARED")}
-                className={`px-3 py-1 rounded-lg transition ${
+                className={`px-2.5 py-1 rounded-lg transition ${
                   filterStatus === "CLEARED" ? "bg-white text-emerald-600 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -391,10 +517,10 @@ export function FinancialAndBillingManagementPage() {
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
               <tr>
                 <th className="py-3 px-4">Flat Unit</th>
+                <th className="py-3 px-4">Flat Category & Occupancy</th>
                 <th className="py-3 px-4">Primary Resident</th>
-                <th className="py-3 px-4 text-right">Area (Sq.Ft.)</th>
-                <th className="py-3 px-4 text-right">Total Invoiced (Debit)</th>
-                <th className="py-3 px-4 text-right">Total Paid (Credit)</th>
+                <th className="py-3 px-4 text-right">Total Billed</th>
+                <th className="py-3 px-4 text-right">Total Paid</th>
                 <th className="py-3 px-4 text-right">Net Balance Due</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -418,11 +544,13 @@ export function FinancialAndBillingManagementPage() {
                 filteredFlats.map((flat) => {
                   const outstanding = parseFloat(flat.current_outstanding_inr || 0);
                   const isDefaulter = outstanding > 0;
+                  const isPenthouse = flat.flat_type === "PENTHOUSE";
+                  const isTenant = flat.occupancy_status === "TENANT_OCCUPIED";
 
                   return (
                     <tr
                       key={flat.flat_id}
-                      className="hover:bg-slate-50/70 transition-colors"
+                      className="hover:bg-slate-50/80 transition-colors"
                     >
                       <td className="py-3.5 px-4 font-bold text-slate-900">
                         <span className="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-blue-50 text-blue-700 font-extrabold mr-2">
@@ -432,16 +560,42 @@ export function FinancialAndBillingManagementPage() {
                       </td>
 
                       <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                              isPenthouse
+                                ? "bg-amber-100 text-amber-900 border border-amber-200"
+                                : "bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}
+                          >
+                            {flat.flat_type || "REGULAR"}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              isTenant
+                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            }`}
+                          >
+                            {isTenant ? "Tenant" : "Owner/Builder"}
+                          </span>
+                          <button
+                            onClick={() => setFlatToEdit(flat)}
+                            className="p-1 text-slate-400 hover:text-blue-600 rounded transition cursor-pointer"
+                            title="Edit Category or Occupancy"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
                         <div className="font-semibold text-slate-800">
                           {flat.resident_name || "Vacant / No Owner"}
                         </div>
                         <div className="text-[11px] text-slate-400 font-mono">
                           {flat.resident_phone || flat.occupancy_status}
                         </div>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right text-slate-600 font-mono">
-                        {parseFloat(flat.super_builtup_area_sqft || 1000).toLocaleString("en-IN")} sq.ft.
                       </td>
 
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-700">
@@ -464,11 +618,11 @@ export function FinancialAndBillingManagementPage() {
 
                       <td className="py-3.5 px-4 text-center">
                         {isDefaulter ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                             Dues Pending
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             All Cleared
                           </span>
                         )}
@@ -518,10 +672,7 @@ export function FinancialAndBillingManagementPage() {
                   Statement for Flat {activeFlatStatement.flat.wing_name}-{activeFlatStatement.flat.flat_number}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Resident: {activeFlatStatement.flat.resident_name || "N/A"} | Current Outstanding:{" "}
-                  <strong className="text-rose-600 font-mono">
-                    ₹{parseFloat(activeFlatStatement.flat.current_outstanding_inr || 0).toLocaleString("en-IN")}
-                  </strong>
+                  {activeFlatStatement.flat.resident_name || "Unassigned"} • {activeFlatStatement.flat.flat_type || "REGULAR"} ({activeFlatStatement.flat.occupancy_status})
                 </p>
               </div>
               <button
@@ -532,38 +683,43 @@ export function FinancialAndBillingManagementPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
-              {/* Unpaid Invoices with UPI QR Action */}
+            <div className="p-6 max-h-[70vh] overflow-y-auto space-y-6">
+              {/* Unpaid Invoices Section */}
               {activeFlatStatement.unpaid?.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Open Invoices Pending Payment
+                  <h4 className="text-xs font-bold text-rose-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    Unpaid Pending Invoices
                   </h4>
                   <div className="space-y-2">
                     {activeFlatStatement.unpaid.map((inv) => (
                       <div
                         key={inv.invoice_id}
-                        className="p-3 bg-rose-50/50 border border-rose-200 rounded-xl flex items-center justify-between"
+                        className="p-3 bg-rose-50/60 border border-rose-200 rounded-xl flex items-center justify-between"
                       >
                         <div>
-                          <div className="font-bold text-slate-900 font-mono text-xs">
-                            {inv.invoice_number} &bull; {inv.billing_period_label}
-                          </div>
-                          <div className="text-[11px] text-slate-500">
-                            Due Date: {inv.due_date} | Total: ₹{inv.total_invoice_amount_inr} | Paid: ₹{inv.paid_amount_inr}
+                          <span className="text-xs font-bold text-slate-900">
+                            {inv.invoice_number}
+                          </span>
+                          <span className="text-[11px] text-slate-500 ml-2">
+                            ({inv.billing_period_label})
+                          </span>
+                          <div className="text-[10px] text-slate-400">
+                            Due Date: {inv.due_date}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold font-mono text-rose-600">
-                            Due: ₹{inv.outstanding_balance_inr}
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-black font-mono text-rose-600">
+                            ₹{parseFloat(inv.outstanding_balance_inr).toLocaleString("en-IN")}
                           </span>
                           <button
-                            onClick={() => setSelectedInvoiceForQr(inv.invoice_id)}
-                            className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-blue-600 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                            title="Generate Instant UPI QR"
+                            onClick={() => {
+                              setSelectedInvoiceForQr(inv.invoice_id);
+                            }}
+                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition cursor-pointer"
+                            title="UPI QR Code"
                           >
-                            <QrCode className="w-3.5 h-3.5" />
-                            <span>QR</span>
+                            <QrCode className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -572,45 +728,48 @@ export function FinancialAndBillingManagementPage() {
                 </div>
               )}
 
-              {/* Immutable Double-Entry Ledger History */}
+              {/* Real-time Ledger Timeline */}
               <div>
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Account Ledger History
+                  Account Ledger Entries (Debits & Credits)
                 </h4>
                 {activeFlatStatement.entries?.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-4">No ledger transactions posted yet.</p>
+                  <p className="text-xs text-slate-400 py-4 text-center">
+                    No ledger transactions recorded yet.
+                  </p>
                 ) : (
                   <div className="border border-slate-200 rounded-xl overflow-hidden">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
                           <th className="p-2.5">Date</th>
                           <th className="p-2.5">Description</th>
-                          <th className="p-2.5 text-right">Debit (₹)</th>
-                          <th className="p-2.5 text-right">Credit (₹)</th>
+                          <th className="p-2.5 text-right text-rose-600">Debit (₹)</th>
+                          <th className="p-2.5 text-right text-emerald-600">Credit (₹)</th>
+                          <th className="p-2.5 text-right font-bold text-slate-900">Balance</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 font-mono">
                         {activeFlatStatement.entries.map((entry) => (
-                          <tr key={entry.entry_id}>
-                            <td className="p-2.5 text-slate-500 font-mono text-[11px]">
+                          <tr key={entry.entry_id} className="hover:bg-slate-50">
+                            <td className="p-2.5 text-slate-600 font-sans text-[11px]">
                               {entry.entry_date}
                             </td>
-                            <td className="p-2.5 font-medium text-slate-800">
+                            <td className="p-2.5 text-slate-800 font-sans text-xs">
                               {entry.description}
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                Ref: {entry.reference_id}
-                              </div>
                             </td>
-                            <td className="p-2.5 text-right font-mono font-semibold text-rose-600">
+                            <td className="p-2.5 text-right text-rose-600">
                               {parseFloat(entry.debit_amount_inr) > 0
-                                ? `₹${entry.debit_amount_inr}`
-                                : "—"}
+                                ? `+₹${parseFloat(entry.debit_amount_inr).toLocaleString("en-IN")}`
+                                : "-"}
                             </td>
-                            <td className="p-2.5 text-right font-mono font-semibold text-emerald-600">
+                            <td className="p-2.5 text-right text-emerald-600">
                               {parseFloat(entry.credit_amount_inr) > 0
-                                ? `₹${entry.credit_amount_inr}`
-                                : "—"}
+                                ? `-₹${parseFloat(entry.credit_amount_inr).toLocaleString("en-IN")}`
+                                : "-"}
+                            </td>
+                            <td className="p-2.5 text-right font-bold text-slate-900">
+                              ₹{parseFloat(entry.running_balance_inr).toLocaleString("en-IN")}
                             </td>
                           </tr>
                         ))}
@@ -620,23 +779,14 @@ export function FinancialAndBillingManagementPage() {
                 )}
               </div>
             </div>
-
-            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <button
-                onClick={() => setActiveFlatStatement(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 cursor-pointer"
-              >
-                Close Statement
-              </button>
-            </div>
           </div>
         </div>
       )}
 
       {/* =========================================================================
-          SECTION 4: SUB-MODALS & DRAWERS
+          MODALS & DRAWERS
          ========================================================================= */}
-      {/* 1. Bulk Invoice Generator Wizard Modal */}
+      {/* 1. Bulk Invoice Generator Modal */}
       <BulkInvoiceGeneratorModal
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}
@@ -654,19 +804,37 @@ export function FinancialAndBillingManagementPage() {
         onPaymentRecorded={fetchAllBillingData}
       />
 
-      {/* 3. Billing Rules & Bank Setup Modal */}
+      {/* 3. Billing Rules Configuration Modal */}
       <BillingConfigurationModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
         initialConfig={billingConfig}
-        onConfigSaved={(updated) => setBillingConfig(updated)}
+        onConfigSaved={(updatedCfg) => {
+          setBillingConfig(updatedCfg);
+          fetchAllBillingData();
+        }}
       />
 
-      {/* 4. Instant UPI QR Code Modal */}
+      {/* 4. Invoice UPI QR Modal */}
       <InvoiceUpiQrModal
-        isOpen={Boolean(selectedInvoiceForQr)}
-        onClose={() => setSelectedInvoiceForQr(null)}
+        isOpen={!!selectedInvoiceForQr}
         invoiceId={selectedInvoiceForQr}
+        onClose={() => setSelectedInvoiceForQr(null)}
+      />
+
+      {/* 5. Official Society Circular Modal */}
+      <MaintenanceNoticeCircularModal
+        isOpen={isCircularModalOpen}
+        onClose={() => setIsCircularModalOpen(false)}
+        noticeData={circularData}
+      />
+
+      {/* 6. Edit Flat Classification Modal */}
+      <EditFlatClassificationModal
+        isOpen={!!flatToEdit}
+        onClose={() => setFlatToEdit(null)}
+        flat={flatToEdit}
+        onSaved={handleFlatClassificationUpdated}
       />
     </div>
   );

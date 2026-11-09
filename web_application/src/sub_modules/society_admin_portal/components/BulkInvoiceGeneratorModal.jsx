@@ -8,6 +8,7 @@ import {
   AlertCircle,
   Calculator,
   Plus,
+  Sparkles,
 } from "lucide-react";
 
 export function BulkInvoiceGeneratorModal({
@@ -20,22 +21,35 @@ export function BulkInvoiceGeneratorModal({
   if (!isOpen) return null;
 
   const today = new Date();
-  const nextMonthYear = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-  const defaultLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // 1-12
   
-  // Default due date: 10th of current month
-  const defaultDueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(billingConfig?.due_day_of_month || 10).padStart(2, "0")}`;
+  // Detect current quarter: Q1 (Jan-Mar), Q2 (Apr-Jun), Q3 (Jul-Sep), Q4 (Oct-Dec)
+  const currentQuarterNum = Math.ceil(currentMonth / 3);
+  const defaultQuarterTag = `${currentYear}-Q${currentQuarterNum}`;
+  const defaultQuarterLabel = `Q${currentQuarterNum} (${currentYear}-${String(currentYear + 1).slice(-2)}): Maintenance Billing`;
 
+  const [cycleType, setCycleType] = useState(
+    billingConfig?.billing_cycle || "QUARTERLY"
+  );
   const [step, setStep] = useState(1); // 1: Period & Heads, 2: Preview & Confirm
-  const [billingPeriodMonth, setBillingPeriodMonth] = useState(nextMonthYear);
-  const [billingPeriodLabel, setBillingPeriodLabel] = useState(defaultLabel);
+  const [billingPeriodMonth, setBillingPeriodMonth] = useState(
+    billingConfig?.billing_cycle === "QUARTERLY" ? defaultQuarterTag : `${currentYear}-${String(currentMonth).padStart(2, "0")}`
+  );
+  const [billingPeriodLabel, setBillingPeriodLabel] = useState(
+    billingConfig?.billing_cycle === "QUARTERLY"
+      ? "વર્ષ ૨૦૨૬-૨૭ Q3: ઓક્ટોબર-૨૬ થી ડીસેમ્બર-૨૬ મેઈન્ટેનન્સ"
+      : today.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  );
+
+  // Default due date: 10th of current/next month
+  const defaultDueDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(billingConfig?.due_day_of_month || 10).padStart(2, "0")}`;
   const [dueDate, setDueDate] = useState(defaultDueDate);
 
   // Selected heads with customizable amounts for this run
   const [selectedHeadsMap, setSelectedHeadsMap] = useState(() => {
     const map = {};
     (availableHeads || []).forEach((h) => {
-      // Exclude General Maintenance if it's dynamically calculated as base
       if (h.head_name !== "General Maintenance") {
         map[h.head_name] = {
           head_name: h.head_name,
@@ -92,6 +106,7 @@ export function BulkInvoiceGeneratorModal({
         body: JSON.stringify({
           billing_period_month: billingPeriodMonth,
           billing_period_label: billingPeriodLabel,
+          billing_cycle: cycleType,
           selected_heads: activeHeads,
         }),
       });
@@ -128,6 +143,7 @@ export function BulkInvoiceGeneratorModal({
           billing_period_month: billingPeriodMonth,
           billing_period_label: billingPeriodLabel,
           due_date: dueDate,
+          billing_cycle: cycleType,
           selected_heads: activeHeads,
         }),
       });
@@ -150,16 +166,16 @@ export function BulkInvoiceGeneratorModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
+      <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 font-heading flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-900 font-heading flex items-center gap-2">
               <Calculator className="w-5 h-5 text-blue-600" />
-              Bulk Invoice Generator Wizard
+              Generate Bulk Society Maintenance Invoices
             </h2>
             <p className="text-xs text-slate-500">
-              Generate monthly society maintenance invoices across all registered flats.
+              Calculate base maintenance (Flat Type & Occupancy aware) and issue ledger debits.
             </p>
           </div>
           <button
@@ -181,7 +197,7 @@ export function BulkInvoiceGeneratorModal({
               1
             </span>
             <span className={step === 1 ? "text-blue-900 font-bold" : "text-slate-500"}>
-              Billing Period & Heads
+              Cycle, Period & Line Heads
             </span>
           </div>
           <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
@@ -194,7 +210,7 @@ export function BulkInvoiceGeneratorModal({
               2
             </span>
             <span className={step === 2 ? "text-blue-900 font-bold" : "text-slate-400"}>
-              Review Preview & Publish
+              Review Breakdown & Post Invoices
             </span>
           </div>
         </div>
@@ -217,37 +233,76 @@ export function BulkInvoiceGeneratorModal({
         <div className="p-6 space-y-6">
           {step === 1 && (
             <div className="space-y-5">
+              {/* Cycle Toggle */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Invoice Frequency / Cycle
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCycleType("QUARTERLY");
+                      setBillingPeriodMonth(defaultQuarterTag);
+                      setBillingPeriodLabel("વર્ષ ૨૦૨૬-૨૭ Q3: ઓક્ટોબર-૨૬ થી ડીસેમ્બર-૨૬ મેઈન્ટેનન્સ");
+                    }}
+                    className={`py-2 px-3 text-xs font-bold rounded-xl border-2 transition text-left cursor-pointer ${
+                      cycleType === "QUARTERLY"
+                        ? "border-blue-600 bg-blue-50 text-blue-900 shadow-xs"
+                        : "border-slate-200 hover:border-slate-300 text-slate-600"
+                    }`}
+                  >
+                    <div>Quarterly (3 Months)</div>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      Regular: ₹7,200 (Owner) / ₹9,000 (Tenant)
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCycleType("MONTHLY");
+                      setBillingPeriodMonth(`${currentYear}-${String(currentMonth).padStart(2, "0")}`);
+                      setBillingPeriodLabel(today.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+                    }}
+                    className={`py-2 px-3 text-xs font-bold rounded-xl border-2 transition text-left cursor-pointer ${
+                      cycleType === "MONTHLY"
+                        ? "border-blue-600 bg-blue-50 text-blue-900 shadow-xs"
+                        : "border-slate-200 hover:border-slate-300 text-slate-600"
+                    }`}
+                  >
+                    <div>Monthly (1 Month)</div>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      Regular: ₹2,400 (Owner) / ₹3,000 (Tenant)
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               {/* Period Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Month Tag
+                    Period Key
                   </label>
                   <input
-                    type="month"
+                    type="text"
                     value={billingPeriodMonth}
-                    onChange={(e) => {
-                      setBillingPeriodMonth(e.target.value);
-                      if (e.target.value) {
-                        const [y, m] = e.target.value.split("-");
-                        const d = new Date(parseInt(y), parseInt(m) - 1, 1);
-                        setBillingPeriodLabel(d.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
-                        setDueDate(`${y}-${m}-${String(billingConfig?.due_day_of_month || 10).padStart(2, "0")}`);
-                      }
-                    }}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                    onChange={(e) => setBillingPeriodMonth(e.target.value)}
+                    placeholder="e.g. 2026-Q3 or 2026-11"
+                    className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Period Display Label
+                    Notice Display Label
                   </label>
                   <input
                     type="text"
                     value={billingPeriodLabel}
                     onChange={(e) => setBillingPeriodLabel(e.target.value)}
-                    placeholder="e.g. November 2026"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                    placeholder="e.g. Q3: Oct-Dec 2026 Maintenance"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -258,43 +313,50 @@ export function BulkInvoiceGeneratorModal({
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
               </div>
 
               {/* Maintenance Calculation Mode Info Box */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-bold text-slate-800">Base Calculation Rule: </span>
-                  <span className="text-blue-600 font-semibold">
-                    {billingConfig?.calculation_mode === "PER_SQFT_AREA"
-                      ? `₹${billingConfig?.rate_per_sqft_inr || 2.50} per sq. ft. of flat area`
-                      : `Fixed ₹${billingConfig?.fixed_monthly_rate_inr || 2000} per flat`}
-                  </span>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                  <div>
+                    <span className="font-bold text-slate-800">Calculation Engine: </span>
+                    <span className="text-blue-700 font-bold">
+                      {billingConfig?.calculation_mode === "TIERED_FLAT_TYPE"
+                        ? "Flat Type & Occupancy Matrix (Regular vs Penthouse, Owner vs Tenant)"
+                        : billingConfig?.calculation_mode === "PER_SQFT_AREA"
+                        ? `₹${billingConfig?.rate_per_sqft_inr || 2.50} per sq.ft.`
+                        : `Fixed ₹${billingConfig?.fixed_monthly_rate_inr || 2400} per flat`}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[11px] text-slate-400">Configured in Rules Engine</span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {cycleType} Mode
+                </span>
               </div>
 
               {/* Additional Billing Heads Selector */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Select Billing Heads to Include
+                  Additional Master Heads (Optional)
                 </label>
-                <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-white max-h-56 overflow-y-auto">
+                <div className="space-y-1.5 border border-slate-200 rounded-xl p-3 bg-white max-h-44 overflow-y-auto">
                   {Object.values(selectedHeadsMap).map((head) => (
                     <div
                       key={head.head_name}
                       className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition"
                     >
-                      <label className="flex items-center gap-2.5 cursor-pointer">
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={head.enabled}
                           onChange={() => toggleHead(head.head_name)}
                           className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                         />
-                        <span className="text-sm font-medium text-slate-800">
+                        <span className="text-xs font-medium text-slate-800">
                           {head.head_name}
                         </span>
                       </label>
@@ -305,7 +367,7 @@ export function BulkInvoiceGeneratorModal({
                           value={head.amount_inr}
                           disabled={!head.enabled}
                           onChange={(e) => updateHeadAmount(head.head_name, e.target.value)}
-                          className="w-24 px-2 py-1 text-xs text-right border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100 disabled:text-slate-400"
+                          className="w-20 px-2 py-1 text-xs text-right font-mono border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100 disabled:text-slate-400"
                         />
                       </div>
                     </div>
@@ -320,20 +382,20 @@ export function BulkInvoiceGeneratorModal({
               {/* Summary Stats Pill */}
               <div className="grid grid-cols-3 gap-3 p-4 bg-blue-50/70 border border-blue-200 rounded-xl text-center">
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 uppercase">Target Flats</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Target Flats</p>
                   <p className="text-xl font-extrabold text-slate-900 font-heading">
                     {previewData.flats_count}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 uppercase">Billing Period</p>
-                  <p className="text-sm font-bold text-blue-700 mt-1">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Cycle & Period</p>
+                  <p className="text-xs font-bold text-blue-700 mt-1 truncate">
                     {previewData.billing_period_label}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 uppercase">Projected Total</p>
-                  <p className="text-xl font-extrabold text-blue-600 font-heading">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Projected Total</p>
+                  <p className="text-xl font-extrabold text-emerald-600 font-heading">
                     ₹{previewData.grand_total_inr.toLocaleString("en-IN")}
                   </p>
                 </div>
@@ -343,7 +405,7 @@ export function BulkInvoiceGeneratorModal({
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>
-                    Warning: Invoices for this month already exist ({previewData.already_generated_count}). Generating again will be blocked to avoid duplicate billing.
+                    Warning: Invoices for this period key already exist ({previewData.already_generated_count}). Posting again will be blocked to avoid duplicate billing.
                   </span>
                 </div>
               )}
@@ -351,18 +413,17 @@ export function BulkInvoiceGeneratorModal({
               {/* Sample Flats Preview Table */}
               <div>
                 <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Sample Invoice Calculations (First {previewData.sample_flats?.length} Flats)
+                  Sample Flat-wise Calculations (First {previewData.sample_flats?.length} Flats)
                 </p>
                 <div className="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
                       <tr>
                         <th className="p-2.5">Flat</th>
+                        <th className="p-2.5">Category & Occupancy</th>
                         <th className="p-2.5">Resident</th>
-                        <th className="p-2.5 text-right">Area</th>
-                        <th className="p-2.5 text-right">Base Maint</th>
-                        <th className="p-2.5 text-right">Addl Heads</th>
-                        <th className="p-2.5 text-right font-bold text-slate-900">Total</th>
+                        <th className="p-2.5 text-right">Base Maintenance</th>
+                        <th className="p-2.5 text-right font-bold text-slate-900">Total Bill</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -371,17 +432,21 @@ export function BulkInvoiceGeneratorModal({
                           <td className="p-2.5 font-bold text-slate-900">
                             {flat.wing_name}-{flat.flat_number}
                           </td>
+                          <td className="p-2.5">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold mr-1 ${
+                              flat.flat_type === "PENTHOUSE" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
+                            }`}>
+                              {flat.flat_type}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {flat.occupancy_status === "TENANT_OCCUPIED" ? "Tenant" : "Owner"}
+                            </span>
+                          </td>
                           <td className="p-2.5 text-slate-600 truncate max-w-[120px]">
                             {flat.resident_name}
                           </td>
-                          <td className="p-2.5 text-right text-slate-500">
-                            {flat.area_sqft} sq.ft.
-                          </td>
                           <td className="p-2.5 text-right font-mono text-slate-700">
                             ₹{flat.base_maintenance_inr}
-                          </td>
-                          <td className="p-2.5 text-right font-mono text-slate-500">
-                            ₹{flat.additional_heads_inr}
                           </td>
                           <td className="p-2.5 text-right font-mono font-bold text-blue-600">
                             ₹{flat.total_invoice_inr}

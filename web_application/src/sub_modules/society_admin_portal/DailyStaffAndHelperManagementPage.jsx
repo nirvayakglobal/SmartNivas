@@ -127,7 +127,9 @@ export function DailyStaffAndHelperManagementPage() {
   };
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem("society_admin_token");
+    const token =
+      localStorage.getItem("smart_nivas_auth_token") ||
+      localStorage.getItem("society_admin_token");
     return {
       "Content-Type": "application/json",
       Authorization: token ? `Bearer ${token}` : "",
@@ -396,7 +398,6 @@ export function DailyStaffAndHelperManagementPage() {
   };
 
   const handleDownloadCsv = (type) => {
-    const token = localStorage.getItem("society_admin_token");
     let url = "";
     if (type === "ATTENDANCE") {
       url = `/api/admin/staff/reports/attendance-log?format=csv&start_date=${reportStartDate}&end_date=${reportEndDate}&category=${reportCategory}`;

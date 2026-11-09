@@ -98,6 +98,7 @@ def create_society_billing_blueprint(
         month = payload.get("billing_period_month", "")
         label = payload.get("billing_period_label", "")
         heads = payload.get("selected_heads", [])
+        billing_cycle = payload.get("billing_cycle")
 
         if not month:
             return jsonify({"success": False, "message": "billing_period_month is required"}), 400
@@ -107,6 +108,7 @@ def create_society_billing_blueprint(
             billing_period_month=month,
             billing_period_label=label,
             selected_heads=heads,
+            billing_cycle_override=billing_cycle,
         )
         return jsonify({"success": True, "data": preview}), 200
 
@@ -119,6 +121,7 @@ def create_society_billing_blueprint(
         label = payload.get("billing_period_label", "")
         due_date = payload.get("due_date", "")
         heads = payload.get("selected_heads", [])
+        billing_cycle = payload.get("billing_cycle")
 
         if not month or not due_date:
             return jsonify({"success": False, "message": "Month and due_date are required."}), 400
@@ -129,9 +132,37 @@ def create_society_billing_blueprint(
             billing_period_label=label,
             due_date_str=due_date,
             selected_heads=heads,
+            billing_cycle_override=billing_cycle,
         )
         status_code = 200 if success else 400
         return jsonify({"success": success, "message": message, "data": result_data}), status_code
+
+    @billing_blueprint.route("/flats/<int:flat_id>/classification", methods=["PUT"])
+    @require_admin
+    def handle_update_flat_classification(flat_id: int):
+        user_context: AuthenticatedUserContext = flask_global_context.authenticated_user_context
+        payload = request.get_json(silent=True) or {}
+        flat_type = payload.get("flat_type", "REGULAR")
+        occupancy_status = payload.get("occupancy_status", "OWNER_OCCUPIED")
+
+        success, message = billing_service.update_flat_classification(
+            society_id=user_context.society_id,
+            flat_id=flat_id,
+            flat_type=flat_type,
+            occupancy_status=occupancy_status,
+        )
+        status_code = 200 if success else 400
+        return jsonify({"success": success, "message": message}), status_code
+
+    @billing_blueprint.route("/notice-circular", methods=["GET"])
+    @require_any
+    def handle_get_notice_circular():
+        user_context: AuthenticatedUserContext = flask_global_context.authenticated_user_context
+        period_label = request.args.get("period_label")
+        data = billing_service.get_society_notice_circular_data(
+            user_context.society_id, period_label=period_label
+        )
+        return jsonify({"success": True, "data": data}), 200
 
     # =========================================================================
     # Flat Ledger & Statement

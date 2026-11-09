@@ -486,6 +486,53 @@ def create_society_admin_portal_blueprint(
             201,
         )
 
+    @society_admin_blueprint.route("/guards/<int:guard_user_id>/status", methods=["PATCH"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_toggle_guard_status(guard_user_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload or "is_active" not in request_payload:
+            return jsonify({"success": False, "message": "'is_active' boolean field is required."}), 400
+
+        is_active = bool(request_payload["is_active"])
+        is_successful, response_message = admin_service.toggle_guard_active_status(
+            society_id=authenticated_user.society_id,  # type: ignore
+            guard_user_id=guard_user_id,
+            is_active=is_active,
+        )
+        return jsonify({"success": is_successful, "message": response_message}), 200
+
+    @society_admin_blueprint.route("/guards/<int:guard_user_id>", methods=["PUT"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_update_guard(guard_user_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        full_name = str(request_payload.get("full_name", "")).strip()
+        phone_number = str(request_payload.get("phone_number", "")).strip()
+        pin = request_payload.get("pin")
+
+        if not full_name or not phone_number:
+            return jsonify({"success": False, "message": "'full_name' and 'phone_number' are required."}), 400
+
+        is_successful, response_message = admin_service.update_security_guard(
+            society_id=authenticated_user.society_id,  # type: ignore
+            guard_user_id=guard_user_id,
+            full_name=full_name,
+            phone_number=phone_number,
+            four_digit_pin=str(pin) if pin else None,
+        )
+        if not is_successful:
+            return jsonify({"success": False, "message": response_message}), 400
+
+        return jsonify({"success": True, "message": response_message}), 200
+
     # -------------------------------------------------------------------------
     # VISITOR AUDIT REGISTER
     # -------------------------------------------------------------------------

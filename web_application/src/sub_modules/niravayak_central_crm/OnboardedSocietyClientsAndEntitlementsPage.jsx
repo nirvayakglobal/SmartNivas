@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   Building2,
   Sliders,
@@ -7,6 +8,7 @@ import {
   UserPlus,
   ToggleLeft,
   ToggleRight,
+  Layers,
 } from "lucide-react";
 
 export function OnboardedSocietyClientsAndEntitlementsPage() {
@@ -284,7 +286,14 @@ export function OnboardedSocietyClientsAndEntitlementsPage() {
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <Link
+                        to="/CRM/provisioner"
+                        className="inline-flex items-center space-x-1 px-3 py-1 bg-white hover:bg-slate-100 text-[#334155] hover:text-blue-600 rounded-sm text-xs font-semibold border border-[#CBD5E1] hover:border-blue-300 transition-colors"
+                      >
+                        <Layers className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Flats</span>
+                      </Link>
                       <button
                         onClick={() => setEditingSocietyRecord({ ...societyRecord })}
                         className="inline-flex items-center space-x-1 px-3 py-1 bg-white hover:bg-blue-50 text-[#334155] hover:text-blue-600 rounded-sm text-xs font-semibold border border-[#CBD5E1] hover:border-blue-300 transition-colors"

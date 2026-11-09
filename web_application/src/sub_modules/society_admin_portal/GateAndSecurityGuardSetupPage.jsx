@@ -6,6 +6,11 @@ import {
   AlertCircle,
   Phone,
   Shield,
+  UserX,
+  UserCheck,
+  Edit2,
+  X,
+  Lock,
 } from "lucide-react";
 
 export function GateAndSecurityGuardSetupPage() {
@@ -28,6 +33,14 @@ export function GateAndSecurityGuardSetupPage() {
   const [isSubmittingGuard, setIsSubmittingGuard] = useState(false);
   const [guardFeedbackMessage, setGuardFeedbackMessage] = useState("");
   const [guardErrorMessage, setGuardErrorMessage] = useState("");
+
+  // Edit Guard Modal State
+  const [editingGuard, setEditingGuard] = useState(null);
+  const [editFullName, setEditFullName] = useState("");
+  const [editPhoneNumber, setEditPhoneNumber] = useState("");
+  const [editPin, setEditPin] = useState("");
+  const [isUpdatingGuard, setIsUpdatingGuard] = useState(false);
+  const [togglingGuardId, setTogglingGuardId] = useState(null);
 
   const fetchGatesAndGuards = async () => {
     setIsLoadingGatesAndGuards(true);
@@ -120,6 +133,83 @@ export function GateAndSecurityGuardSetupPage() {
       setGuardErrorMessage("Network error creating guard.");
     } finally {
       setIsSubmittingGuard(false);
+    }
+  };
+
+  const handleToggleGuardStatus = async (guardItem) => {
+    setTogglingGuardId(guardItem.user_id);
+    setGuardFeedbackMessage("");
+    setGuardErrorMessage("");
+
+    try {
+      const storedAuthToken = localStorage.getItem("smart_nivas_auth_token");
+      const nextStatus = !guardItem.is_active;
+      const res = await fetch(`/api/admin/guards/${guardItem.user_id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${storedAuthToken}`,
+        },
+        body: JSON.stringify({ is_active: nextStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGuardFeedbackMessage(data.message || `Guard status changed.`);
+        fetchGatesAndGuards();
+      } else {
+        setGuardErrorMessage(data.message || "Failed to update guard status.");
+      }
+    } catch (err) {
+      setGuardErrorMessage("Network error updating guard status.");
+    } finally {
+      setTogglingGuardId(null);
+    }
+  };
+
+  const handleStartEditGuard = (guardItem) => {
+    setEditingGuard(guardItem);
+    setEditFullName(guardItem.full_name);
+    setEditPhoneNumber(guardItem.phone_number);
+    setEditPin("");
+  };
+
+  const handleUpdateGuardSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingGuard) return;
+    setIsUpdatingGuard(true);
+    setGuardFeedbackMessage("");
+    setGuardErrorMessage("");
+
+    try {
+      const storedAuthToken = localStorage.getItem("smart_nivas_auth_token");
+      const payload = {
+        full_name: editFullName,
+        phone_number: editPhoneNumber,
+      };
+      if (editPin.trim()) {
+        payload.pin = editPin.trim();
+      }
+
+      const res = await fetch(`/api/admin/guards/${editingGuard.user_id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${storedAuthToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGuardFeedbackMessage(data.message || "Guard updated successfully.");
+        setEditingGuard(null);
+        fetchGatesAndGuards();
+      } else {
+        setGuardErrorMessage(data.message || "Failed to update guard.");
+      }
+    } catch (err) {
+      setGuardErrorMessage("Network error updating guard.");
+    } finally {
+      setIsUpdatingGuard(false);
     }
   };
 
@@ -251,31 +341,104 @@ export function GateAndSecurityGuardSetupPage() {
             )}
 
             {/* Existing Guards List */}
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
               {gatesAndGuardsData.guards.length === 0 ? (
                 <div className="text-center py-6 text-xs text-[#94A3B8] italic">
                   No guard accounts registered yet.
                 </div>
               ) : (
-                gatesAndGuardsData.guards.map((guardItem) => (
-                  <div
-                    key={guardItem.user_id}
-                    className="flex items-center justify-between p-3 rounded-md bg-[#F8FAFC] border border-[#E2E8F0]"
-                  >
-                    <div>
-                      <div className="text-sm font-bold text-[#0F172A] font-heading">
-                        {guardItem.full_name}
+                gatesAndGuardsData.guards.map((guardItem) => {
+                  const isActive = !!guardItem.is_active;
+                  const isToggling = togglingGuardId === guardItem.user_id;
+
+                  return (
+                    <div
+                      key={guardItem.user_id}
+                      className={`flex items-center justify-between p-3 rounded-md border transition-all ${
+                        isActive
+                          ? "bg-[#F8FAFC] border-[#E2E8F0]"
+                          : "bg-slate-50 border-dashed border-slate-300 opacity-75"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${
+                            isActive
+                              ? "bg-blue-100 text-blue-700 border border-blue-200"
+                              : "bg-slate-200 text-slate-500 border border-slate-300"
+                          }`}
+                        >
+                          {guardItem.full_name?.charAt(0)?.toUpperCase() || "G"}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-sm font-bold font-heading ${
+                                isActive ? "text-[#0F172A]" : "text-slate-500 line-through"
+                              }`}
+                            >
+                              {guardItem.full_name}
+                            </span>
+                            <span
+                              className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                isActive
+                                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                  : "text-amber-800 bg-amber-50 border-amber-200"
+                              }`}
+                            >
+                              {isActive ? "Active Duty" : "Inactive / Suspended"}
+                            </span>
+                          </div>
+                          <div className="text-xs font-mono text-[#64748B] flex items-center gap-1.5 mt-0.5">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{guardItem.phone_number}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs font-mono text-[#64748B] flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3 text-emerald-600" />
-                        {guardItem.phone_number}
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Edit Guard Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditGuard(guardItem)}
+                          title="Edit Guard Details or Reset PIN"
+                          className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded transition-colors text-xs flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Inactivate / Activate Toggle Button */}
+                        <button
+                          type="button"
+                          disabled={isToggling}
+                          onClick={() => handleToggleGuardStatus(guardItem)}
+                          title={
+                            isActive
+                              ? "Inactivate Guard (Revokes gate app login)"
+                              : "Reactivate Guard (Restores gate access)"
+                          }
+                          className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors flex items-center gap-1.5 ${
+                            isActive
+                              ? "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
+                              : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                          }`}
+                        >
+                          {isActive ? (
+                            <>
+                              <UserX className="w-3.5 h-3.5" />
+                              <span>{isToggling ? "Updating..." : "Inactivate"}</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>{isToggling ? "Updating..." : "Activate"}</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                      Gate Guard
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -325,6 +488,94 @@ export function GateAndSecurityGuardSetupPage() {
           </form>
         </div>
       </div>
+
+      {/* Edit Guard Modal */}
+      {editingGuard && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg border border-[#CBD5E1] shadow-xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between bg-[#F8FAFC]">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-blue-600" />
+                <h4 className="font-bold text-[#0F172A] text-sm">
+                  Edit Guard Personnel Details
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingGuard(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateGuardSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Guard Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full bg-white border border-[#CBD5E1] rounded px-3 py-2 text-xs text-[#0F172A] focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Mobile Phone Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={editPhoneNumber}
+                  onChange={(e) => setEditPhoneNumber(e.target.value)}
+                  className="w-full bg-white border border-[#CBD5E1] rounded px-3 py-2 text-xs text-[#0F172A] focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Reset 4-Digit PIN Passcode</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    (Leave empty to keep unchanged)
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    maxLength={4}
+                    placeholder="Enter new 4-digit numeric PIN"
+                    value={editPin}
+                    onChange={(e) => setEditPin(e.target.value)}
+                    className="w-full bg-white border border-[#CBD5E1] rounded pl-8 pr-3 py-2 text-xs text-[#0F172A] font-mono focus:outline-none focus:border-blue-600"
+                  />
+                  <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingGuard(null)}
+                  className="px-3.5 py-1.5 rounded text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingGuard}
+                  className="px-4 py-1.5 rounded text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm active:scale-[0.98] disabled:opacity-60"
+                >
+                  {isUpdatingGuard ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
