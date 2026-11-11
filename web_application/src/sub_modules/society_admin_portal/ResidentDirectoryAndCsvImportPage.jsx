@@ -309,21 +309,21 @@ B,201,Priya Sharma,9825333333,TENANT`;
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#0F172A] font-heading flex items-center gap-2">
-            <Users className="w-6 h-6 text-blue-600" />
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0F172A] font-heading flex items-center gap-2">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             Resident Directory & Onboarding
           </h2>
-          <p className="text-sm text-[#64748B] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
             Manage society members, tenant directories, and batch CSV user onboarding.
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => setIsAddResidentModalOpen(true)}
-            className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg shadow-sm text-xs transition-all"
+            className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg shadow-sm text-xs transition-all shrink-0"
           >
             <UserPlus className="w-4 h-4" />
             <span>Add Single Resident</span>
@@ -332,17 +332,17 @@ B,201,Priya Sharma,9825333333,TENANT`;
           <button
             onClick={handleExportCsv}
             disabled={societyResidentsList.length === 0}
-            className="flex items-center space-x-1.5 bg-white hover:bg-slate-50 border border-[#CBD5E1] text-[#334155] font-semibold px-3.5 py-2.5 rounded-lg shadow-sm text-xs transition-all disabled:opacity-50"
+            className="flex items-center space-x-1.5 bg-white hover:bg-slate-50 border border-[#CBD5E1] text-[#334155] font-semibold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-lg shadow-sm text-xs transition-all disabled:opacity-50 shrink-0"
           >
             <Download className="w-4 h-4 text-[#64748B]" />
             <span>Export CSV</span>
           </button>
 
-          <div className="flex items-center space-x-3 bg-white border border-[#E2E8F0] rounded-lg px-4 py-2.5 shadow-sm">
+          <div className="flex items-center space-x-2 bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 sm:py-2 shadow-sm shrink-0">
             <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
-              TOTAL RESIDENTS
+              TOTAL:
             </span>
-            <span className="text-lg font-bold text-[#0F172A] font-heading">
+            <span className="text-xs sm:text-sm font-bold text-[#0F172A] font-heading">
               {societyResidentsList.length} Members
             </span>
           </div>
@@ -350,8 +350,8 @@ B,201,Priya Sharma,9825333333,TENANT`;
       </div>
 
       {/* CSV Bulk Importer */}
-      <div className="bg-white border border-[#E2E8F0] rounded-lg p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+      <div className="bg-white border border-[#E2E8F0] rounded-lg p-4 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
           <div>
             <h3 className="text-base font-bold text-[#0F172A] font-heading flex items-center gap-2">
               <Upload className="w-5 h-5 text-blue-600" />
@@ -359,7 +359,7 @@ B,201,Priya Sharma,9825333333,TENANT`;
             </h3>
             <p className="text-xs text-[#64748B] mt-0.5">
               Upload a UTF-8 CSV matching headers:{" "}
-              <code className="text-blue-600 font-mono">
+              <code className="text-blue-600 font-mono text-[11px] sm:text-xs break-all">
                 wing_name, flat_number, full_name, phone_number, resident_type
               </code>
             </p>
@@ -368,7 +368,7 @@ B,201,Priya Sharma,9825333333,TENANT`;
           <button
             type="button"
             onClick={() => setCsvFileContent(sampleCsvTemplate)}
-            className="flex items-center space-x-1.5 px-3 py-1 bg-white hover:bg-[#F8FAFC] text-[#334155] rounded-sm text-xs font-semibold border border-[#CBD5E1] transition-colors shadow-sm"
+            className="self-start sm:self-auto flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-[#F8FAFC] text-[#334155] rounded-md text-xs font-semibold border border-[#CBD5E1] transition-colors shadow-sm shrink-0"
           >
             <FileText className="w-3.5 h-3.5 text-blue-600" />
             <span>Load Sample CSV</span>

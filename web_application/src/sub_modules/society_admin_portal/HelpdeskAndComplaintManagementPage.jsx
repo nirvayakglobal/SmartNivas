@@ -391,7 +391,7 @@ export function HelpdeskAndComplaintManagementPage() {
       </div>
 
       {/* Tab Navigation Navigation Bar */}
-      <div className="flex border-b border-slate-200 gap-6">
+      <div className="flex border-b border-slate-200 gap-6 overflow-x-auto pb-0.5">
         <button
           onClick={() => setActiveTab("KANBAN")}
           className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${

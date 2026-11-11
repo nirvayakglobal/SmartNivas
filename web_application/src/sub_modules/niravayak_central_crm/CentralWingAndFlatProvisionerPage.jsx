@@ -419,7 +419,7 @@ export function CentralWingAndFlatProvisionerPage() {
         </div>
 
         {/* Target Society Selector Card (Clean Light Style) */}
-        <div className="bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl p-4 lg:min-w-[360px] shrink-0 space-y-2 shadow-inner">
+        <div className="bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl p-4 w-full lg:w-auto lg:min-w-[360px] shrink-0 space-y-2 shadow-inner">
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-[#475569] uppercase tracking-wider flex items-center gap-1.5">
               <Building2 className="w-4 h-4 text-blue-600" /> Target Society Client

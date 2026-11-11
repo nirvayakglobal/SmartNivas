@@ -156,7 +156,7 @@ export function FinancialReportsPage() {
       </div>
 
       {/* Report Switcher Tabs */}
-      <div className="flex border-b border-slate-200 gap-4 text-xs font-bold">
+      <div className="flex border-b border-slate-200 gap-4 text-xs font-bold overflow-x-auto">
         <button
           onClick={() => setActiveReportTab("DEFAULTERS")}
           className={`pb-3 px-1 border-b-2 transition flex items-center gap-2 ${

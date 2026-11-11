@@ -252,10 +252,10 @@ export function SocietyDashboardOverviewPage() {
             <ArrowUpRight className="w-4 h-4 text-[#94A3B8] group-hover:text-blue-600" />
           </div>
           <h3 className="text-base font-bold text-[#0F172A] font-heading">
-            Wings & Floor Matrix
+            Wings & Flat Directory
           </h3>
           <p className="text-xs text-[#64748B] mt-1">
-            Visual building elevation stack, irregular floor customization, and individual apartment management.
+            Visual building elevation stack, wings layout, and apartment inventory.
           </p>
         </Link>
 

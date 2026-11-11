@@ -42,7 +42,7 @@ def create_society_admin_portal_blueprint(
         )
 
     # -------------------------------------------------------------------------
-    # TOPOLOGY (WINGS & FLATS)
+    # TOPOLOGY (WINGS & FLATS) - READ ONLY FOR SOCIETY ADMIN
     # -------------------------------------------------------------------------
 
     @society_admin_blueprint.route("/topology", methods=["GET"])
@@ -59,183 +59,58 @@ def create_society_admin_portal_blueprint(
     @society_admin_blueprint.route("/topology/bulk-generate", methods=["POST"])
     @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
     def handle_bulk_generate_flats():
-        authenticated_user: AuthenticatedUserContext = (
-            flask_global_context.authenticated_user_context
-        )
-        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
-        if not request_payload:
-            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
-
-        wing_names_list = request_payload.get("wing_names", [])
-        start_floor_number = int(request_payload.get("start_floor_number", 1))
-        end_floor_number = int(request_payload.get("end_floor_number", 10))
-        flats_per_floor_count = int(request_payload.get("flats_per_floor_count", 4))
-        numbering_pattern = str(
-            request_payload.get("numbering_pattern", "FLOOR_PREFIX")
-        )
-
-        try:
-            is_successful, response_message, summary_data = (
-                admin_service.bulk_generate_wings_and_flats(
-                    society_id=authenticated_user.society_id,  # type: ignore
-                    wing_names_list=wing_names_list,
-                    start_floor_number=start_floor_number,
-                    end_floor_number=end_floor_number,
-                    flats_per_floor_count=flats_per_floor_count,
-                    numbering_pattern=numbering_pattern,
-                )
-            )
-        except ValueError as validation_error:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error_code": "DUPLICATE_OR_INVALID_TOPOLOGY",
-                        "message": str(validation_error),
-                    }
-                ),
-                409,
-            )
-
-        if not is_successful:
-            return jsonify({"success": False, "message": response_message}), 400
-
         return (
             jsonify(
                 {
-                    "success": True,
-                    "message": response_message,
-                    "data": summary_data,
+                    "success": False,
+                    "error_code": "PROVISIONING_LOCKED",
+                    "message": "Topology provisioning is managed centrally by Niravayak Global CRM. Society Admin cannot generate or alter building topology.",
                 }
             ),
-            201,
+            403,
         )
 
     @society_admin_blueprint.route("/topology/flats", methods=["POST"])
     @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
     def handle_create_single_flat():
-        authenticated_user: AuthenticatedUserContext = (
-            flask_global_context.authenticated_user_context
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error_code": "PROVISIONING_LOCKED",
+                    "message": "Topology provisioning is managed centrally by Niravayak Global CRM. Society Admin cannot add new flats.",
+                }
+            ),
+            403,
         )
-        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
-        if not request_payload:
-            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
-
-        wing_name = str(request_payload.get("wing_name", "")).strip()
-        floor_number = int(request_payload.get("floor_number", 1))
-        flat_number = str(request_payload.get("flat_number", "")).strip()
-        occupancy_status = str(
-            request_payload.get("occupancy_status", "OWNER_OCCUPIED")
-        )
-
-        try:
-            is_successful, response_message, flat_data = (
-                admin_service.create_single_flat(
-                    society_id=authenticated_user.society_id,  # type: ignore
-                    wing_name=wing_name,
-                    floor_number=floor_number,
-                    flat_number=flat_number,
-                    occupancy_status=occupancy_status,
-                )
-            )
-            return (
-                jsonify(
-                    {
-                        "success": is_successful,
-                        "message": response_message,
-                        "data": flat_data,
-                    }
-                ),
-                201,
-            )
-        except ValueError as validation_error:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error_code": "INVALID_FLAT_PAYLOAD",
-                        "message": str(validation_error),
-                    }
-                ),
-                400,
-            )
 
     @society_admin_blueprint.route("/topology/flats/<int:flat_id>", methods=["PATCH"])
     @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
     def handle_update_flat(flat_id: int):
-        authenticated_user: AuthenticatedUserContext = (
-            flask_global_context.authenticated_user_context
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error_code": "PROVISIONING_LOCKED",
+                    "message": "Topology provisioning is managed centrally by Niravayak Global CRM. Society Admin cannot modify building topology.",
+                }
+            ),
+            403,
         )
-        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
-        if not request_payload:
-            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
-
-        flat_number = str(request_payload.get("flat_number", "")).strip()
-        floor_number = int(request_payload.get("floor_number", 1))
-        occupancy_status = str(
-            request_payload.get("occupancy_status", "OWNER_OCCUPIED")
-        )
-
-        try:
-            is_successful, response_message = admin_service.update_flat(
-                society_id=authenticated_user.society_id,  # type: ignore
-                flat_id=flat_id,
-                flat_number=flat_number,
-                floor_number=floor_number,
-                occupancy_status=occupancy_status,
-            )
-            return (
-                jsonify(
-                    {
-                        "success": is_successful,
-                        "message": response_message,
-                    }
-                ),
-                200,
-            )
-        except ValueError as validation_error:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error_code": "UPDATE_FLAT_ERROR",
-                        "message": str(validation_error),
-                    }
-                ),
-                400,
-            )
 
     @society_admin_blueprint.route("/topology/flats/<int:flat_id>", methods=["DELETE"])
     @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
     def handle_delete_flat(flat_id: int):
-        authenticated_user: AuthenticatedUserContext = (
-            flask_global_context.authenticated_user_context
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error_code": "PROVISIONING_LOCKED",
+                    "message": "Topology provisioning is managed centrally by Niravayak Global CRM. Society Admin cannot delete flats.",
+                }
+            ),
+            403,
         )
-        try:
-            is_successful, response_message = admin_service.delete_flat(
-                society_id=authenticated_user.society_id,  # type: ignore
-                flat_id=flat_id,
-            )
-            return (
-                jsonify(
-                    {
-                        "success": is_successful,
-                        "message": response_message,
-                    }
-                ),
-                200,
-            )
-        except ValueError as validation_error:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error_code": "DELETE_FLAT_ERROR",
-                        "message": str(validation_error),
-                    }
-                ),
-                400,
-            )
 
     # -------------------------------------------------------------------------
     # RESIDENTS DIRECTORY & CSV IMPORT

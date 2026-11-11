@@ -159,7 +159,7 @@ class SocietyBillingRepository:
             LIMIT 6
         """
         database_cursor.execute(query_monthly, (society_id,))
-        monthly_series = database_cursor.fetchall()
+        monthly_series = list(database_cursor.fetchall() or [])
         monthly_series.reverse()  # chronological order for charts
 
         return {

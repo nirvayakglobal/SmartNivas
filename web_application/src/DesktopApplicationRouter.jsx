@@ -97,7 +97,7 @@ export function DesktopApplicationRouter() {
     },
     {
       targetPath: "/Society/Admin/topology",
-      displayLabel: "Wings & Flat Generator",
+      displayLabel: "Wings & Flat Directory",
       iconComponent: Layers,
     },
     {

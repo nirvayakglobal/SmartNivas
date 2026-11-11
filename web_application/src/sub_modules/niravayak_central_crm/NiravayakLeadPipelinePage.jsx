@@ -124,20 +124,20 @@ export function NiravayakLeadPipelinePage() {
   return (
     <div className="space-y-6">
       {/* Page Title & Action Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#0F172A] font-heading flex items-center gap-2">
-            <Users className="w-6 h-6 text-blue-600" />
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0F172A] font-heading flex items-center gap-2">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             Society Lead Pipeline
           </h2>
-          <p className="text-sm text-[#64748B] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
             Track prospective residential societies from discovery to proposal and client conversion.
           </p>
         </div>
 
         <button
           onClick={() => setIsCapturingNewLeadModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-md shadow-sm transition-all text-sm active:scale-[0.98]"
+          className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-md shadow-sm transition-all text-xs sm:text-sm active:scale-[0.98] shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
           <span>Capture Prospective Lead</span>
