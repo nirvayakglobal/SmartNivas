@@ -62,6 +62,40 @@ class SocietyAdministrationService:
                     society_id=society_id,
                 )
             )
+            members_list: List[Dict[str, Any]] = (
+                self._topology_repository.get_active_flat_members_for_society(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                )
+            )
+            all_documents = self._topology_repository.get_all_documents_for_society_residents(
+                database_cursor=database_cursor,
+                society_id=society_id,
+            )
+
+            # Map documents by user_id
+            documents_by_user_id: Dict[int, List[Dict[str, Any]]] = {}
+            for doc_item in all_documents:
+                target_user_id = doc_item["user_id"]
+                if target_user_id not in documents_by_user_id:
+                    documents_by_user_id[target_user_id] = []
+                documents_by_user_id[target_user_id].append(doc_item)
+
+            for member in members_list:
+                user_id_key = member.get("user_id")
+                member["documents"] = documents_by_user_id.get(user_id_key, [])
+
+            # Group members by flat_id
+            members_by_flat_id: Dict[int, List[Dict[str, Any]]] = {}
+            for member in members_list:
+                flat_id_key = member.get("flat_id")
+                if flat_id_key is not None:
+                    members_by_flat_id.setdefault(flat_id_key, []).append(member)
+
+            # Attach members directly to flat object
+            for flat_item in flats_list:
+                flat_item["members"] = members_by_flat_id.get(flat_item["flat_id"], [])
+
             return {"wings": wings_list, "flats": flats_list}
 
     def bulk_generate_wings_and_flats(
@@ -306,10 +340,28 @@ class SocietyAdministrationService:
         self, society_id: int
     ) -> List[Dict[str, Any]]:
         with self._database_connection_manager.database_read_scope() as database_cursor:
-            return self._topology_repository.get_all_residents_for_society(
+            residents_list = self._topology_repository.get_all_residents_for_society(
                 database_cursor=database_cursor,
                 society_id=society_id,
             )
+            all_documents = self._topology_repository.get_all_documents_for_society_residents(
+                database_cursor=database_cursor,
+                society_id=society_id,
+            )
+
+            # Map documents by user_id
+            documents_by_user_id: Dict[int, List[Dict[str, Any]]] = {}
+            for doc_item in all_documents:
+                target_user_id = doc_item["user_id"]
+                if target_user_id not in documents_by_user_id:
+                    documents_by_user_id[target_user_id] = []
+                documents_by_user_id[target_user_id].append(doc_item)
+
+            for resident_record in residents_list:
+                user_id = resident_record["user_id"]
+                resident_record["documents"] = documents_by_user_id.get(user_id, [])
+
+            return residents_list
 
     def import_residents_from_csv(
         self,
@@ -354,7 +406,8 @@ class SocietyAdministrationService:
                 cleaned_phone_number: str = phone_number.strip()
                 normalized_resident_type: str = (
                     resident_type.strip().upper()
-                    if resident_type.strip().upper() in {"OWNER", "TENANT", "FAMILY_MEMBER"}
+                    if resident_type.strip().upper()
+                    in {"OWNER", "TENANT", "OWNER_FAMILY", "TENANT_FAMILY", "FAMILY_MEMBER"}
                     else "OWNER"
                 )
 
@@ -394,6 +447,10 @@ class SocietyAdministrationService:
                     password_hash=default_resident_password_hash,
                     resident_type=normalized_resident_type,
                     approval_status="APPROVED",
+                )
+                self._topology_repository.refresh_flat_occupancy_status(
+                    database_cursor=database_cursor,
+                    flat_id=flat_record["flat_id"],
                 )
                 imported_resident_records_count += 1
 
@@ -452,6 +509,7 @@ class SocietyAdministrationService:
                     f"Flat '{cleaned_flat_number}' does not exist in Wing '{cleaned_wing_name}'."
                 )
 
+            old_flat_id: Optional[int] = existing_user.get("flat_id")
             self._topology_repository.update_resident_user(
                 database_cursor=database_cursor,
                 society_id=society_id,
@@ -462,8 +520,58 @@ class SocietyAdministrationService:
                 resident_type=resident_type,
                 approval_status=approval_status,
             )
+            # Refresh occupancy status for both old and new flats
+            if old_flat_id:
+                self._topology_repository.refresh_flat_occupancy_status(
+                    database_cursor=database_cursor,
+                    flat_id=old_flat_id,
+                )
+            self._topology_repository.refresh_flat_occupancy_status(
+                database_cursor=database_cursor,
+                flat_id=target_flat["flat_id"],
+            )
 
         return True, f"Resident '{cleaned_full_name}' updated successfully."
+
+    def update_resident_approval_status(
+        self,
+        society_id: int,
+        user_id: int,
+        approval_status: str,
+    ) -> Tuple[bool, str]:
+        """
+        Updates a resident's approval status (PENDING, APPROVED, REJECTED).
+        When status changes to/from APPROVED, re-evaluates flat occupancy.
+        """
+        normalized_status = approval_status.strip().upper()
+        if normalized_status not in {"PENDING", "APPROVED", "REJECTED"}:
+            raise ValueError("Status must be PENDING, APPROVED, or REJECTED.")
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_user: Optional[Dict[str, Any]] = (
+                self._topology_repository.find_user_by_id(
+                    database_cursor=database_cursor,
+                    user_id=user_id,
+                )
+            )
+            if not existing_user or existing_user["society_id"] != society_id:
+                raise ValueError("Target resident not found in this society.")
+
+            self._topology_repository.update_resident_approval_status(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                user_id=user_id,
+                approval_status=normalized_status,
+            )
+
+            target_flat_id: Optional[int] = existing_user.get("flat_id")
+            if target_flat_id:
+                self._topology_repository.refresh_flat_occupancy_status(
+                    database_cursor=database_cursor,
+                    flat_id=target_flat_id,
+                )
+
+        return True, f"Resident status updated to {normalized_status}."
 
     def delete_resident(
         self,
@@ -483,13 +591,103 @@ class SocietyAdministrationService:
             if not existing_user or existing_user["society_id"] != society_id:
                 raise ValueError("Target resident not found in this society.")
 
+            target_flat_id: Optional[int] = existing_user.get("flat_id")
             self._topology_repository.delete_resident_user(
                 database_cursor=database_cursor,
                 society_id=society_id,
                 user_id=user_id,
             )
+            if target_flat_id:
+                self._topology_repository.refresh_flat_occupancy_status(
+                    database_cursor=database_cursor,
+                    flat_id=target_flat_id,
+                )
 
         return True, "Resident deleted successfully."
+
+    # -------------------------------------------------------------------------
+    # RESIDENT VERIFICATION DOCUMENTS WORKFLOW
+    # -------------------------------------------------------------------------
+
+    def retrieve_resident_documents(
+        self,
+        society_id: int,
+        user_id: int,
+    ) -> List[Dict[str, Any]]:
+        with self._database_connection_manager.database_read_scope() as database_cursor:
+            existing_user = self._topology_repository.find_user_by_id(
+                database_cursor=database_cursor,
+                user_id=user_id,
+            )
+            if not existing_user or existing_user["society_id"] != society_id:
+                raise ValueError("Target resident not found in this society.")
+
+            return self._topology_repository.get_documents_for_resident(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                user_id=user_id,
+            )
+
+    def attach_document_to_resident(
+        self,
+        society_id: int,
+        user_id: int,
+        document_type: str,
+        document_title: str,
+        file_name: str,
+        file_path_or_url: str,
+        file_size_bytes: Optional[int] = None,
+        uploaded_by_user_id: Optional[int] = None,
+    ) -> Tuple[bool, str, Optional[int]]:
+        allowed_types = {
+            "AADHAAR_CARD",
+            "FLAT_INDEX_COPY",
+            "OWNER_PHOTO",
+            "RENT_AGREEMENT",
+            "POLICE_VERIFICATION",
+            "OTHER",
+        }
+        normalized_doc_type = document_type.strip().upper()
+        if normalized_doc_type not in allowed_types:
+            raise ValueError(f"Invalid document type '{document_type}'.")
+
+        cleaned_title = document_title.strip() or normalized_doc_type.replace("_", " ").title()
+        cleaned_file_name = file_name.strip() or "document.pdf"
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            existing_user = self._topology_repository.find_user_by_id(
+                database_cursor=database_cursor,
+                user_id=user_id,
+            )
+            if not existing_user or existing_user["society_id"] != society_id:
+                raise ValueError("Target resident not found in this society.")
+
+            new_doc_id = self._topology_repository.insert_resident_document(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                user_id=user_id,
+                document_type=normalized_doc_type,
+                document_title=cleaned_title,
+                file_name=cleaned_file_name,
+                file_path_or_url=file_path_or_url,
+                file_size_bytes=file_size_bytes,
+                uploaded_by_user_id=uploaded_by_user_id,
+            )
+
+        return True, "Document uploaded successfully.", new_doc_id
+
+    def remove_resident_document(
+        self,
+        society_id: int,
+        document_id: int,
+    ) -> Tuple[bool, str]:
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            self._topology_repository.delete_resident_document(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                document_id=document_id,
+            )
+        return True, "Document deleted successfully."
 
     # -------------------------------------------------------------------------
     # GATES & SECURITY GUARDS SETUP
@@ -704,14 +902,20 @@ class SocietyAdministrationService:
         full_name: str,
         phone_number: str,
         resident_type: str = "OWNER",
+        approval_status: str = "APPROVED",
+        documents: Optional[List[Dict[str, Any]]] = None,
     ) -> Tuple[bool, str, Optional[int]]:
         """
         Creates an individual resident record linked to an existing flat.
+        Supports admin registration with optional verification documents and initial approval status.
         """
         cleaned_wing_name: str = wing_name.strip().upper()
         cleaned_flat_number: str = flat_number.strip().upper()
         cleaned_full_name: str = full_name.strip()
         cleaned_phone_number: str = phone_number.strip()
+        normalized_approval_status: str = approval_status.strip().upper()
+        if normalized_approval_status not in {"PENDING", "APPROVED", "REJECTED"}:
+            normalized_approval_status = "APPROVED"
 
         if not cleaned_full_name or not cleaned_phone_number:
             return False, "Full name and phone number are required.", None
@@ -758,6 +962,186 @@ class SocietyAdministrationService:
                 phone_number=cleaned_phone_number,
                 password_hash=default_password_hash,
                 resident_type=resident_type.upper(),
-                approval_status="APPROVED",
+                approval_status=normalized_approval_status,
+            )
+
+            # Attach optional verification documents provided at registration time
+            if documents and isinstance(documents, list):
+                for doc_item in documents:
+                    doc_type = str(doc_item.get("document_type", "OTHER")).upper()
+                    doc_title = str(doc_item.get("document_title", "")).strip() or doc_type.replace("_", " ").title()
+                    file_name = str(doc_item.get("file_name", "document.pdf")).strip()
+                    file_path_or_url = str(doc_item.get("file_path_or_url", "")).strip()
+                    file_size = doc_item.get("file_size_bytes")
+                    if file_path_or_url:
+                        self._topology_repository.insert_resident_document(
+                            database_cursor=database_cursor,
+                            society_id=society_id,
+                            user_id=new_resident_id,
+                            document_type=doc_type,
+                            document_title=doc_title,
+                            file_name=file_name,
+                            file_path_or_url=file_path_or_url,
+                            file_size_bytes=int(file_size) if file_size else None,
+                        )
+
+            self._topology_repository.refresh_flat_occupancy_status(
+                database_cursor=database_cursor,
+                flat_id=target_flat["flat_id"],
             )
             return True, f"Resident '{cleaned_full_name}' added successfully.", new_resident_id
+
+    def transfer_flat_ownership(
+        self,
+        society_id: int,
+        flat_id: int,
+        admin_user_id: int,
+        new_owner_name: str,
+        new_owner_phone: str,
+        transfer_sale_date: str,
+        sale_deed_document_url: Optional[str] = None,
+        sale_deed_document_filename: Optional[str] = None,
+        transfer_remarks: Optional[str] = None,
+        transfer_fee_inr: float = 0.0,
+        fee_category: str = "SOCIETY_TRANSFER_FEE",
+        society_development_fund_inr: float = 0.0,
+        payment_mode: str = "NEFT_RTGS",
+        payment_reference_number: Optional[str] = None,
+        deactivate_previous_owner: bool = True,
+    ) -> Tuple[bool, str, Optional[int]]:
+        """
+        Executes an ownership sale/transfer workflow:
+        1. Records historical ownership transfer audit entry.
+        2. Deactivates previous owner & family accounts (resident_type -> PAST_OWNER, is_active -> FALSE).
+        3. Creates and activates the new owner record.
+        4. Attaches the Sale Deed / Index-II document to the new owner's profile.
+        5. Updates flat occupancy status atomically.
+        """
+        cleaned_owner_name: str = new_owner_name.strip()
+        cleaned_owner_phone: str = new_owner_phone.strip()
+        if not cleaned_owner_name or not cleaned_owner_phone:
+            return False, "New owner name and phone number are required.", None
+
+        with self._database_connection_manager.database_transaction_scope() as database_cursor:
+            # 1. Look up flat
+            database_cursor.execute(
+                "SELECT flat_id, society_id, wing_id, flat_number, occupancy_status FROM flats WHERE flat_id = %s AND society_id = %s",
+                (flat_id, society_id),
+            )
+            target_flat: Optional[Dict[str, Any]] = database_cursor.fetchone()
+            if not target_flat:
+                return False, "Target apartment flat not found.", None
+
+            # 2. Find current active owner (if any)
+            database_cursor.execute(
+                "SELECT user_id, full_name, phone_number, resident_type "
+                "FROM users WHERE flat_id = %s AND society_id = %s AND resident_type = 'OWNER' AND is_active = TRUE "
+                "LIMIT 1",
+                (flat_id, society_id),
+            )
+            current_owner: Optional[Dict[str, Any]] = database_cursor.fetchone()
+
+            previous_owner_id: Optional[int] = current_owner["user_id"] if current_owner else None
+            previous_owner_name_val: str = current_owner["full_name"] if current_owner else "Builder / Initial Developer"
+            previous_owner_phone_val: Optional[str] = current_owner["phone_number"] if current_owner else None
+
+            # 3. Check if new owner phone number already exists
+            database_cursor.execute(
+                "SELECT user_id, full_name, flat_id FROM users WHERE phone_number = %s AND society_id = %s",
+                (cleaned_owner_phone, society_id),
+            )
+            conflicting_user: Optional[Dict[str, Any]] = database_cursor.fetchone()
+
+            default_password_hash: str = generate_password_hash(
+                "Resident@SmartNivas2026!", method="scrypt"
+            )
+
+            new_owner_id: int
+            if conflicting_user:
+                # Update existing user to new owner of this flat
+                new_owner_id = conflicting_user["user_id"]
+                database_cursor.execute(
+                    "UPDATE users SET "
+                    "full_name = %s, flat_id = %s, user_role = 'RESIDENT', resident_type = 'OWNER', "
+                    "approval_status = 'APPROVED', is_active = TRUE "
+                    "WHERE user_id = %s",
+                    (cleaned_owner_name, flat_id, new_owner_id),
+                )
+            else:
+                # Insert fresh owner user
+                new_owner_id = self._topology_repository.insert_resident_user(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    flat_id=flat_id,
+                    full_name=cleaned_owner_name,
+                    phone_number=cleaned_owner_phone,
+                    password_hash=default_password_hash,
+                    resident_type="OWNER",
+                    approval_status="APPROVED",
+                )
+
+            # 4. Attach Sale Deed / Registered Index-II Document
+            if sale_deed_document_url:
+                self._topology_repository.insert_resident_document(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    user_id=new_owner_id,
+                    document_type="SALE_DEED",
+                    document_title="Registered Sale Deed / Transfer Agreement",
+                    file_name=sale_deed_document_filename or "sale_deed_transfer.pdf",
+                    file_path_or_url=sale_deed_document_url,
+                    file_size_bytes=None,
+                )
+
+            # 5. Insert Flat Ownership Transfer History Entry
+            self._topology_repository.insert_flat_ownership_history(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+                previous_owner_user_id=previous_owner_id,
+                previous_owner_name=previous_owner_name_val,
+                previous_owner_phone=previous_owner_phone_val,
+                new_owner_user_id=new_owner_id,
+                new_owner_name=cleaned_owner_name,
+                new_owner_phone=cleaned_owner_phone,
+                transfer_sale_date=transfer_sale_date,
+                sale_deed_document_url=sale_deed_document_url,
+                sale_deed_document_filename=sale_deed_document_filename,
+                transfer_remarks=transfer_remarks,
+                transfer_fee_inr=float(transfer_fee_inr or 0.0),
+                fee_category=fee_category,
+                society_development_fund_inr=float(society_development_fund_inr or 0.0),
+                payment_mode=payment_mode,
+                payment_reference_number=payment_reference_number,
+                recorded_by_admin_user_id=admin_user_id,
+            )
+
+            # 6. Deactivate all prior owners and their family members if requested
+            if deactivate_previous_owner:
+                self._topology_repository.deactivate_owner_and_family_members(
+                    database_cursor=database_cursor,
+                    society_id=society_id,
+                    flat_id=flat_id,
+                    new_owner_user_id=new_owner_id,
+                )
+
+            # 7. Update flat status
+            self._topology_repository.refresh_flat_occupancy_status(
+                database_cursor=database_cursor,
+                flat_id=flat_id,
+            )
+
+            return True, f"Ownership of Flat {target_flat['flat_number']} successfully transferred to {cleaned_owner_name}.", new_owner_id
+
+    def retrieve_flat_ownership_history(
+        self, society_id: int, flat_id: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieves complete ownership audit trail for a flat.
+        """
+        with self._database_connection_manager.database_read_scope() as database_cursor:
+            return self._topology_repository.get_ownership_history_for_flat(
+                database_cursor=database_cursor,
+                society_id=society_id,
+                flat_id=flat_id,
+            )

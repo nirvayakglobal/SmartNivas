@@ -58,6 +58,20 @@ export function DesktopWebPortalLayout({
   const isSuperAdmin = parsedUserProfile?.user_role === "SUPER_ADMIN";
   const isSocietyAdmin = parsedUserProfile?.user_role === "SOCIETY_ADMIN";
 
+  // Determine current active navigation item for page title display
+  const currentActiveNavItem = navigationItems?.find((item) => {
+    if (currentBrowserLocation.pathname === item.targetPath) return true;
+    // Also handle trailing or nested paths
+    if (item.targetPath !== "/Society/Admin/dashboard" && item.targetPath !== "/CRM/leads") {
+      return currentBrowserLocation.pathname.startsWith(item.targetPath);
+    }
+    return false;
+  });
+
+  const currentPageTitle =
+    currentActiveNavItem?.displayLabel ||
+    (portalType === "admin" ? "Society Admin ERP" : portalTitle || "Command Center");
+
   if (!storedAuthToken || !parsedUserProfile) {
     const targetLoginRoute =
       portalType === "admin" ? "/Society/Admin/login" : "/CRM/login";
@@ -101,8 +115,10 @@ export function DesktopWebPortalLayout({
                 <span className="font-bold text-base tracking-tight text-[#0F172A] font-heading block truncate leading-tight">
                   Smart Nivas
                 </span>
-                <span className="text-[10px] uppercase font-bold text-blue-600 tracking-wider block truncate">
-                  {currentOperatorBadge}
+                <span className="text-[10px] uppercase font-bold text-blue-600 tracking-wider block truncate" title={portalType === "admin" && parsedSocietyProfile?.society_legal_name ? parsedSocietyProfile.society_legal_name : currentOperatorBadge}>
+                  {portalType === "admin" && parsedSocietyProfile?.society_legal_name
+                    ? parsedSocietyProfile.society_legal_name
+                    : currentOperatorBadge}
                 </span>
               </div>
             )}
@@ -253,9 +269,7 @@ export function DesktopWebPortalLayout({
 
             <div className="flex items-center space-x-2 min-w-0">
               <span className="text-sm sm:text-base font-bold text-[#0F172A] tracking-tight font-heading truncate">
-                {portalType === "admin" && parsedSocietyProfile?.society_legal_name
-                  ? parsedSocietyProfile.society_legal_name
-                  : portalTitle || "Smart Nivas"}
+                {currentPageTitle}
               </span>
             </div>
           </div>

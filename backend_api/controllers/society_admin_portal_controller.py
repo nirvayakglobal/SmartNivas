@@ -230,6 +230,42 @@ def create_society_admin_portal_blueprint(
                 400,
             )
 
+    @society_admin_blueprint.route("/residents/<int:resident_user_id>/approval", methods=["PATCH"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_update_resident_approval(resident_user_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload or "approval_status" not in request_payload:
+            return (
+                jsonify({"success": False, "message": "'approval_status' field is required."}),
+                400,
+            )
+
+        approval_status = str(request_payload["approval_status"]).upper()
+        try:
+            is_successful, response_message = admin_service.update_resident_approval_status(
+                society_id=authenticated_user.society_id,  # type: ignore
+                user_id=resident_user_id,
+                approval_status=approval_status,
+            )
+            return (
+                jsonify({"success": is_successful, "message": response_message}),
+                200,
+            )
+        except ValueError as validation_error:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "APPROVAL_STATUS_ERROR",
+                        "message": str(validation_error),
+                    }
+                ),
+                400,
+            )
+
     @society_admin_blueprint.route("/residents/<int:resident_user_id>", methods=["DELETE"])
     @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
     def handle_delete_resident(resident_user_id: int):
@@ -535,6 +571,8 @@ def create_society_admin_portal_blueprint(
         wing_name = str(request_payload.get("wing_name", "")).strip()
         flat_number = str(request_payload.get("flat_number", "")).strip()
         resident_type = str(request_payload.get("resident_type", "OWNER")).upper()
+        approval_status = str(request_payload.get("approval_status", "APPROVED")).upper()
+        documents = request_payload.get("documents", [])
 
         is_successful, response_message, new_resident_id = (
             admin_service.create_single_resident(
@@ -544,6 +582,8 @@ def create_society_admin_portal_blueprint(
                 full_name=full_name,
                 phone_number=phone_number,
                 resident_type=resident_type,
+                approval_status=approval_status,
+                documents=documents,
             )
         )
         if not is_successful:
@@ -559,5 +599,164 @@ def create_society_admin_portal_blueprint(
             ),
             201,
         )
+
+    # -------------------------------------------------------------------------
+    # RESIDENT VERIFICATION DOCUMENTS MANAGEMENT
+    # -------------------------------------------------------------------------
+
+    @society_admin_blueprint.route("/residents/<int:resident_user_id>/documents", methods=["GET"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_get_resident_documents(resident_user_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        try:
+            documents_list = admin_service.retrieve_resident_documents(
+                society_id=authenticated_user.society_id,  # type: ignore
+                user_id=resident_user_id,
+            )
+            return jsonify({"success": True, "data": documents_list}), 200
+        except ValueError as retrieval_error:
+            return jsonify({"success": False, "message": str(retrieval_error)}), 404
+
+    @society_admin_blueprint.route("/residents/<int:resident_user_id>/documents", methods=["POST"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_upload_resident_document(resident_user_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        document_type = str(request_payload.get("document_type", "OTHER")).upper()
+        document_title = str(request_payload.get("document_title", "")).strip()
+        file_name = str(request_payload.get("file_name", "document.pdf")).strip()
+        file_path_or_url = str(request_payload.get("file_path_or_url", "")).strip()
+        file_size_bytes = request_payload.get("file_size_bytes")
+
+        if not file_path_or_url:
+            return jsonify({"success": False, "message": "'file_path_or_url' is required."}), 400
+
+        try:
+            is_successful, response_message, new_doc_id = (
+                admin_service.attach_document_to_resident(
+                    society_id=authenticated_user.society_id,  # type: ignore
+                    user_id=resident_user_id,
+                    document_type=document_type,
+                    document_title=document_title,
+                    file_name=file_name,
+                    file_path_or_url=file_path_or_url,
+                    file_size_bytes=int(file_size_bytes) if file_size_bytes else None,
+                    uploaded_by_user_id=authenticated_user.user_id,
+                )
+            )
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": response_message,
+                        "data": {"document_id": new_doc_id},
+                    }
+                ),
+                201,
+            )
+        except ValueError as validation_error:
+            return jsonify({"success": False, "message": str(validation_error)}), 400
+
+    @society_admin_blueprint.route("/residents/documents/<int:document_id>", methods=["DELETE"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_delete_resident_document(document_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        is_successful, response_message = admin_service.remove_resident_document(
+            society_id=authenticated_user.society_id,  # type: ignore
+            document_id=document_id,
+        )
+        return jsonify({"success": is_successful, "message": response_message}), 200
+
+    # -------------------------------------------------------------------------
+    # FLAT OWNERSHIP TRANSFER & HISTORICAL AUDIT
+    # -------------------------------------------------------------------------
+
+    @society_admin_blueprint.route("/flats/<int:flat_id>/ownership-transfer", methods=["POST"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_transfer_flat_ownership(flat_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        request_payload: Optional[Dict[str, Any]] = request.get_json(silent=True)
+        if not request_payload:
+            return jsonify({"success": False, "message": "Invalid JSON body."}), 400
+
+        new_owner_name = str(request_payload.get("new_owner_name", "")).strip()
+        new_owner_phone = str(request_payload.get("new_owner_phone", "")).strip()
+        transfer_sale_date = str(request_payload.get("transfer_sale_date", "")).strip()
+        sale_deed_document_url = request_payload.get("sale_deed_document_url")
+        sale_deed_document_filename = request_payload.get("sale_deed_document_filename")
+        transfer_remarks = request_payload.get("transfer_remarks")
+        transfer_fee_inr = float(request_payload.get("transfer_fee_inr") or 0.0)
+        fee_category = str(request_payload.get("fee_category", "SOCIETY_TRANSFER_FEE"))
+        society_development_fund_inr = float(request_payload.get("society_development_fund_inr") or 0.0)
+        payment_mode = str(request_payload.get("payment_mode", "NEFT_RTGS"))
+        payment_reference_number = request_payload.get("payment_reference_number")
+        deactivate_previous_owner = bool(request_payload.get("deactivate_previous_owner", True))
+
+        if not new_owner_name or not new_owner_phone or not transfer_sale_date:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "New owner name, phone number, and sale/transfer date are required.",
+                    }
+                ),
+                400,
+            )
+
+        is_successful, response_message, new_owner_id = (
+            admin_service.transfer_flat_ownership(
+                society_id=authenticated_user.society_id,  # type: ignore
+                flat_id=flat_id,
+                admin_user_id=authenticated_user.user_id,  # type: ignore
+                new_owner_name=new_owner_name,
+                new_owner_phone=new_owner_phone,
+                transfer_sale_date=transfer_sale_date,
+                sale_deed_document_url=sale_deed_document_url,
+                sale_deed_document_filename=sale_deed_document_filename,
+                transfer_remarks=transfer_remarks,
+                transfer_fee_inr=transfer_fee_inr,
+                fee_category=fee_category,
+                society_development_fund_inr=society_development_fund_inr,
+                payment_mode=payment_mode,
+                payment_reference_number=payment_reference_number,
+                deactivate_previous_owner=deactivate_previous_owner,
+            )
+        )
+        if not is_successful:
+            return jsonify({"success": False, "message": response_message}), 400
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": response_message,
+                    "data": {"new_owner_user_id": new_owner_id},
+                }
+            ),
+            201,
+        )
+
+    @society_admin_blueprint.route("/flats/<int:flat_id>/ownership-history", methods=["GET"])
+    @require_society_permission(allowed_roles=["SOCIETY_ADMIN"])
+    def handle_get_flat_ownership_history(flat_id: int):
+        authenticated_user: AuthenticatedUserContext = (
+            flask_global_context.authenticated_user_context
+        )
+        ownership_history_records = admin_service.retrieve_flat_ownership_history(
+            society_id=authenticated_user.society_id,  # type: ignore
+            flat_id=flat_id,
+        )
+        return jsonify({"success": True, "data": ownership_history_records}), 200
 
     return society_admin_blueprint

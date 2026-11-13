@@ -167,76 +167,83 @@ export function FinancialAndBillingManagementPage() {
   const isQuarterly = billingConfig?.billing_cycle === "QUARTERLY";
 
   return (
-    <div className="space-y-6 antialiased pb-12 font-sans">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 font-heading tracking-tight flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-sm">
-              <IndianRupee className="w-5 h-5" />
-            </span>
-            Financial & Maintenance Billing
-          </h1>
-          <p className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-2">
-            <span>Accounts receivable ledger & tiered flat-wise maintenance calculations</span>
-            <span className="inline-block w-1 h-1 rounded-full bg-slate-300" />
-            <span className="font-semibold text-blue-600">
-              {isQuarterly ? "Quarterly Cycle" : "Monthly Cycle"}
-            </span>
-          </p>
-        </div>
+    <div className="space-y-6 antialiased pb-12 font-sans relative">
+      {/* Subtle ambient light gradient backdrop for glassmorphism */}
+      <div className="absolute -top-10 left-1/4 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-20 right-10 w-96 h-96 bg-emerald-100/30 rounded-full blur-3xl pointer-events-none -z-10" />
 
-        {/* Global Action Buttons */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Official Notice Circular Preview Button */}
-          <button
-            onClick={handleOpenCircularModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-xs transition cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-slate-500" />
-            <span>Notice Circular (પરિપત્ર)</span>
-          </button>
+      {/* Modern Frosted Glass Hero Header */}
+      <div className="relative backdrop-blur-xl bg-white/75 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-6 transition-all">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                Accounts Receivable & Invoicing
+              </span>
+              <span className="text-xs font-semibold text-slate-500">
+                {isQuarterly ? "Quarterly Cycle" : "Monthly Cycle"} • {flatsLedger.length} Flats Registered
+              </span>
+            </div>
 
-          <button
-            onClick={() => setIsConfigModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition cursor-pointer"
-          >
-            <Settings className="w-4 h-4 text-slate-500" />
-            <span>Rules & Bank Setup</span>
-          </button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+                <IndianRupee className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-900 font-heading">
+                  Maintenance & Income
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Accounts receivable ledger, tiered flat-wise maintenance calculations, and real-time reconciliation.
+                </p>
+              </div>
+            </div>
+          </div>
 
-          <button
-            onClick={() => {
-              setSelectedFlatForPayment(null);
-              setIsPaymentDrawerOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition cursor-pointer"
-          >
-            <CreditCard className="w-4 h-4 text-emerald-600" />
-            <span>Record Payment</span>
-          </button>
+          {/* Global Action Buttons */}
+          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+            <button
+              onClick={() => setIsConfigModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white/80 hover:bg-white border border-slate-200/90 shadow-xs hover:shadow transition-all hover:-translate-y-0.5 cursor-pointer"
+            >
+              <Settings className="w-4 h-4 text-slate-500" />
+              <span>Rules & Bank Setup</span>
+            </button>
 
-          <button
-            onClick={() => setIsInvoiceModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/25 transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Generate Invoices</span>
-          </button>
+            <button
+              onClick={() => {
+                setSelectedFlatForPayment(null);
+                setIsPaymentDrawerOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white/80 hover:bg-white border border-slate-200/90 shadow-xs hover:shadow transition-all hover:-translate-y-0.5 cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4 text-emerald-600" />
+              <span>Record Payment</span>
+            </button>
+
+            <button
+              onClick={() => setIsInvoiceModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow transition-all hover:-translate-y-0.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Generate Invoices</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* =========================================================================
-          ACTIVE TIERED RATE BANNER
+          ACTIVE TIERED RATE BANNER (Light Modern Frosted Glass Bento)
          ========================================================================= */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md bg-blue-500/30 text-blue-200 border border-blue-400/30 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
+      <div className="p-5 rounded-2xl backdrop-blur-xl bg-white/75 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 shadow-2xs">
+              <Sparkles className="w-3 h-3 text-amber-500" />
               Active Pricing Engine
             </span>
-            <span className="text-xs font-bold text-white">
+            <span className="text-xs font-bold text-slate-800">
               {isTiered
                 ? `Flat-Type & Occupancy Matrix (${isQuarterly ? "Quarterly" : "Monthly"})`
                 : billingConfig?.calculation_mode === "PER_SQFT_AREA"
@@ -244,21 +251,21 @@ export function FinancialAndBillingManagementPage() {
                 : `Uniform ₹${billingConfig?.fixed_monthly_rate_inr}/flat`}
             </span>
           </div>
-          <p className="text-xs text-blue-200/80">
-            Shilp Serenity Model: Regular Flats ₹{isQuarterly ? "7,200 (Owner) / ₹9,000 (Tenant)" : "2,400 (Owner) / ₹3,000 (Tenant)"} • Penthouses ₹{isQuarterly ? "8,700 (Owner) / ₹10,500 (Tenant)" : "2,900 (Owner) / ₹3,500 (Tenant)"} per quarter.
+          <p className="text-xs text-slate-600 font-medium">
+            Shilp Serenity Model: Regular Flats <span className="font-semibold text-slate-900">₹{isQuarterly ? "7,200 (Owner) / ₹9,000 (Tenant)" : "2,400 (Owner) / ₹3,000 (Tenant)"}</span> • Penthouses <span className="font-semibold text-slate-900">₹{isQuarterly ? "8,700 (Owner) / ₹10,500 (Tenant)" : "2,900 (Owner) / ₹3,500 (Tenant)"}</span> per quarter.
           </p>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right">
-            <span className="text-[10px] text-blue-200 block uppercase font-bold tracking-wider">Late Payment Fine</span>
-            <span className="text-sm font-extrabold text-amber-300 font-mono">
+            <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Late Payment Fine</span>
+            <span className="text-sm font-extrabold text-amber-600 font-mono">
               ₹{billingConfig?.penalty_amount_or_rate || 500} / mo
             </span>
           </div>
           <button
             onClick={() => setIsConfigModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition cursor-pointer"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
           >
             Modify Rates
           </button>
@@ -266,15 +273,15 @@ export function FinancialAndBillingManagementPage() {
       </div>
 
       {/* =========================================================================
-          SECTION 1: DASHBOARD KPIS & MONTHLY BAR CHART
+          SECTION 1: FROSTED GLASS BENTO GRID (KPIS & PERFORMANCE CHART)
          ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: 3 KPI Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Left Column: 3 Bento KPI Cards */}
         <div className="space-y-4">
           {/* Total Billed */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="backdrop-blur-xl bg-white/75 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-5 rounded-2xl flex items-center justify-between hover:shadow-md transition-all">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Total Invoiced
               </p>
               <h2 className="text-2xl font-black text-slate-900 font-heading mt-1">
@@ -284,15 +291,15 @@ export function FinancialAndBillingManagementPage() {
                 {dashboardSummary?.total_invoices_issued || 0} bills issued across cycles
               </span>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50/80 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
               <FileSpreadsheet className="w-6 h-6" />
             </div>
           </div>
 
           {/* Total Collected */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="backdrop-blur-xl bg-white/75 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-5 rounded-2xl flex items-center justify-between hover:shadow-md transition-all">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Collected Receipts
               </p>
               <h2 className="text-2xl font-black text-emerald-600 font-heading mt-1">
@@ -303,15 +310,15 @@ export function FinancialAndBillingManagementPage() {
                 Credited & Reconciled
               </span>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50/80 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
               <ArrowDownLeft className="w-6 h-6" />
             </div>
           </div>
 
           {/* Outstanding Dues */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="backdrop-blur-xl bg-white/75 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-5 rounded-2xl flex items-center justify-between hover:shadow-md transition-all">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Outstanding Dues
               </p>
               <h2 className="text-2xl font-black text-rose-600 font-heading mt-1">
@@ -322,14 +329,14 @@ export function FinancialAndBillingManagementPage() {
                 {dashboardSummary?.defaulters_count || 0} Defaulter flats pending payment
               </span>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50/80 border border-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-xs">
               <Clock className="w-6 h-6" />
             </div>
           </div>
         </div>
 
         {/* Right Column: Monthly Invoicing vs Collection Bar Chart (Spans 2 cols) */}
-        <div className="lg:col-span-2 p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-2 backdrop-blur-xl bg-white/75 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.03)] p-6 rounded-2xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -374,13 +381,13 @@ export function FinancialAndBillingManagementPage() {
                         {/* Billed Bar */}
                         <div
                           style={{ height: `${billedHeight}%` }}
-                          className="w-1/2 max-w-[28px] bg-blue-600/80 group-hover:bg-blue-600 rounded-t-md transition-all relative"
+                          className="w-1/2 max-w-[28px] bg-blue-600/80 group-hover:bg-blue-600 rounded-t-lg transition-all relative shadow-2xs"
                           title={`Billed: ₹${item.billed_amount}`}
                         />
                         {/* Collected Bar */}
                         <div
                           style={{ height: `${collectedHeight}%` }}
-                          className="w-1/2 max-w-[28px] bg-emerald-500/80 group-hover:bg-emerald-500 rounded-t-md transition-all relative"
+                          className="w-1/2 max-w-[28px] bg-emerald-500/80 group-hover:bg-emerald-500 rounded-t-lg transition-all relative shadow-2xs"
                           title={`Collected: ₹${item.collected_amount}`}
                         />
                       </div>
@@ -418,16 +425,16 @@ export function FinancialAndBillingManagementPage() {
       </div>
 
       {/* =========================================================================
-          SECTION 2: FLAT-BY-FLAT LEDGER DATA GRID
+          SECTION 2: FLAT-BY-FLAT LEDGER DATA GRID (Frosted Glass Bento Container)
          ========================================================================= */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="backdrop-blur-xl bg-white/80 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.03)] rounded-2xl overflow-hidden">
         {/* Table Controls */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/40">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-slate-900 font-heading">
               Flat-by-Flat Accounts Receivable Ledger
             </h3>
-            <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold font-mono">
+            <span className="text-xs bg-slate-100/90 text-slate-600 px-2.5 py-0.5 rounded-full font-bold font-mono border border-slate-200/60">
               {filteredFlats.length} Flats
             </span>
           </div>
@@ -441,16 +448,16 @@ export function FinancialAndBillingManagementPage() {
                 placeholder="Search flat, resident..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none w-44 sm:w-56"
+                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50/70 hover:bg-white focus:bg-white border border-slate-200/90 rounded-xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:outline-none w-44 sm:w-56 transition-all"
               />
             </div>
 
             {/* Type Filter Tabs */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+            <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl text-xs font-semibold border border-slate-200/60">
               <button
                 onClick={() => setFilterType("ALL")}
                 className={`px-2.5 py-1 rounded-lg transition ${
-                  filterType === "ALL" ? "bg-white text-blue-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  filterType === "ALL" ? "bg-white text-blue-700 font-bold shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 All Types
@@ -458,7 +465,7 @@ export function FinancialAndBillingManagementPage() {
               <button
                 onClick={() => setFilterType("REGULAR")}
                 className={`px-2.5 py-1 rounded-lg transition ${
-                  filterType === "REGULAR" ? "bg-white text-blue-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  filterType === "REGULAR" ? "bg-white text-blue-700 font-bold shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 Regular
@@ -466,7 +473,7 @@ export function FinancialAndBillingManagementPage() {
               <button
                 onClick={() => setFilterType("PENTHOUSE")}
                 className={`px-2.5 py-1 rounded-lg transition ${
-                  filterType === "PENTHOUSE" ? "bg-white text-amber-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  filterType === "PENTHOUSE" ? "bg-white text-amber-700 font-bold shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 Penthouse
@@ -474,7 +481,7 @@ export function FinancialAndBillingManagementPage() {
               <button
                 onClick={() => setFilterType("TENANTS")}
                 className={`px-2.5 py-1 rounded-lg transition ${
-                  filterType === "TENANTS" ? "bg-white text-indigo-700 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  filterType === "TENANTS" ? "bg-white text-indigo-700 font-bold shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 Tenants
@@ -482,11 +489,11 @@ export function FinancialAndBillingManagementPage() {
             </div>
 
             {/* Defaulter / Cleared Filter Tabs */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+            <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl text-xs font-semibold border border-slate-200/60">
               <button
                 onClick={() => setFilterStatus("ALL")}
                 className={`px-2.5 py-1 rounded-lg transition ${
-                  filterStatus === "ALL" ? "bg-white text-slate-800 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  filterStatus === "ALL" ? "bg-white text-slate-800 font-bold shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 All Dues
@@ -494,7 +501,7 @@ export function FinancialAndBillingManagementPage() {
               <button
                 onClick={() => setFilterStatus("DEFAULTERS")}
                 className={`px-2.5 py-1 rounded-lg transition ${
-                  filterStatus === "DEFAULTERS" ? "bg-white text-rose-600 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  filterStatus === "DEFAULTERS" ? "bg-white text-rose-600 font-bold shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 Defaulters
@@ -502,7 +509,7 @@ export function FinancialAndBillingManagementPage() {
               <button
                 onClick={() => setFilterStatus("CLEARED")}
                 className={`px-2.5 py-1 rounded-lg transition ${
-                  filterStatus === "CLEARED" ? "bg-white text-emerald-600 font-bold shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  filterStatus === "CLEARED" ? "bg-white text-emerald-600 font-bold shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 Cleared
@@ -514,7 +521,7 @@ export function FinancialAndBillingManagementPage() {
         {/* Table Content */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+            <thead className="bg-slate-50/70 border-b border-slate-200/80 text-slate-500 font-semibold uppercase tracking-wider">
               <tr>
                 <th className="py-3 px-4">Flat Unit</th>
                 <th className="py-3 px-4">Flat Category & Occupancy</th>
@@ -550,10 +557,10 @@ export function FinancialAndBillingManagementPage() {
                   return (
                     <tr
                       key={flat.flat_id}
-                      className="hover:bg-slate-50/80 transition-colors"
+                      className="hover:bg-blue-50/30 transition-colors"
                     >
                       <td className="py-3.5 px-4 font-bold text-slate-900">
-                        <span className="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-blue-50 text-blue-700 font-extrabold mr-2">
+                        <span className="w-7 h-7 inline-flex items-center justify-center rounded-lg bg-blue-50 text-blue-700 font-extrabold mr-2 border border-blue-100">
                           {flat.wing_name}
                         </span>
                         {flat.flat_number}
@@ -661,12 +668,18 @@ export function FinancialAndBillingManagementPage() {
       </div>
 
       {/* =========================================================================
-          SECTION 3: FLAT STATEMENT & LEDGER TIMELINE MODAL
+          SECTION 3: FLAT STATEMENT & LEDGER TIMELINE MODAL (Frosted Glass Dialog)
          ========================================================================= */}
       {activeFlatStatement && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setActiveFlatStatement(null)}
+        >
+          <div
+            className="backdrop-blur-2xl bg-white/95 border border-slate-200/90 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-slate-900 font-heading">
                   Statement for Flat {activeFlatStatement.flat.wing_name}-{activeFlatStatement.flat.flat_number}
@@ -677,7 +690,7 @@ export function FinancialAndBillingManagementPage() {
               </div>
               <button
                 onClick={() => setActiveFlatStatement(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
               >
                 ✕
               </button>
@@ -695,7 +708,7 @@ export function FinancialAndBillingManagementPage() {
                     {activeFlatStatement.unpaid.map((inv) => (
                       <div
                         key={inv.invoice_id}
-                        className="p-3 bg-rose-50/60 border border-rose-200 rounded-xl flex items-center justify-between"
+                        className="p-3.5 bg-rose-50/70 border border-rose-200/90 rounded-2xl flex items-center justify-between"
                       >
                         <div>
                           <span className="text-xs font-bold text-slate-900">
@@ -716,7 +729,7 @@ export function FinancialAndBillingManagementPage() {
                             onClick={() => {
                               setSelectedInvoiceForQr(inv.invoice_id);
                             }}
-                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition cursor-pointer"
+                            className="p-1.5 text-blue-600 hover:bg-blue-100/70 rounded-xl transition cursor-pointer"
                             title="UPI QR Code"
                           >
                             <QrCode className="w-4 h-4" />
@@ -738,9 +751,9 @@ export function FinancialAndBillingManagementPage() {
                     No ledger transactions recorded yet.
                   </p>
                 ) : (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="border border-slate-200/90 rounded-2xl overflow-hidden shadow-2xs">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                      <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200">
                         <tr>
                           <th className="p-2.5">Date</th>
                           <th className="p-2.5">Description</th>
@@ -751,7 +764,7 @@ export function FinancialAndBillingManagementPage() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-mono">
                         {activeFlatStatement.entries.map((entry) => (
-                          <tr key={entry.entry_id} className="hover:bg-slate-50">
+                          <tr key={entry.entry_id} className="hover:bg-slate-50/70 transition-colors">
                             <td className="p-2.5 text-slate-600 font-sans text-[11px]">
                               {entry.entry_date}
                             </td>
@@ -834,6 +847,7 @@ export function FinancialAndBillingManagementPage() {
         isOpen={!!flatToEdit}
         onClose={() => setFlatToEdit(null)}
         flat={flatToEdit}
+        availableCategories={Object.keys(billingConfig?.parsed_flat_type_rates || {})}
         onSaved={handleFlatClassificationUpdated}
       />
     </div>

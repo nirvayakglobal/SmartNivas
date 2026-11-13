@@ -124,7 +124,7 @@ CREATE TABLE users (
     phone_number VARCHAR(20) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     user_role ENUM('SUPER_ADMIN', 'SOCIETY_ADMIN', 'GUARD', 'RESIDENT') NOT NULL,
-    resident_type ENUM('OWNER', 'TENANT', 'FAMILY_MEMBER') NULL,
+    resident_type ENUM('OWNER', 'TENANT', 'OWNER_FAMILY', 'TENANT_FAMILY', 'FAMILY_MEMBER') NULL,
     approval_status ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'APPROVED',
     bootstrap_activation_token VARCHAR(120) NULL,
     is_bootstrap_pending BOOLEAN NOT NULL DEFAULT FALSE,
@@ -164,6 +164,30 @@ CREATE TABLE society_visitors (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_society_visitor_phone (society_id, visitor_phone_number),
     CONSTRAINT fk_visitor_society FOREIGN KEY (society_id) REFERENCES societies(society_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Resident verification and identity compliance documents (Aadhaar, Index Copy, Photo, Rent Agreement, Police Verification)
+CREATE TABLE IF NOT EXISTS resident_verification_documents (
+    document_id INT AUTO_INCREMENT PRIMARY KEY,
+    society_id INT NOT NULL,
+    user_id INT NOT NULL,
+    document_type ENUM(
+        'AADHAAR_CARD',
+        'FLAT_INDEX_COPY',
+        'OWNER_PHOTO',
+        'RENT_AGREEMENT',
+        'POLICE_VERIFICATION',
+        'OTHER'
+    ) NOT NULL,
+    document_title VARCHAR(150) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path_or_url LONGTEXT NOT NULL,
+    file_size_bytes INT NULL,
+    uploaded_by_user_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_doc_society_user (society_id, user_id),
+    CONSTRAINT fk_doc_society FOREIGN KEY (society_id) REFERENCES societies(society_id) ON DELETE CASCADE,
+    CONSTRAINT fk_doc_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE visit_logs (

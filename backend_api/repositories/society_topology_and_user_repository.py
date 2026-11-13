@@ -245,6 +245,22 @@ class SocietyTopologyAndUserRepository:
         database_cursor.execute(select_flat_query, (wing_id, flat_number))
         return database_cursor.fetchone()
 
+    def find_flat_by_wing_name_and_flat_number(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        wing_name: str,
+        flat_number: str,
+    ) -> Optional[Dict[str, Any]]:
+        select_flat_query: str = (
+            "SELECT f.flat_id, f.society_id, f.wing_id, f.flat_number, f.floor_number, f.occupancy_status, w.wing_name "
+            "FROM flats f "
+            "JOIN wings w ON f.wing_id = w.wing_id "
+            "WHERE f.society_id = %s AND w.wing_name = %s AND f.flat_number = %s"
+        )
+        database_cursor.execute(select_flat_query, (society_id, wing_name, flat_number))
+        return database_cursor.fetchone()
+
     def insert_flat(
         self,
         database_cursor: DictCursor,
@@ -306,6 +322,37 @@ class SocietyTopologyAndUserRepository:
         )
         database_cursor.execute(delete_flat_query, (flat_id, society_id))
 
+    def refresh_flat_occupancy_status(
+        self,
+        database_cursor: DictCursor,
+        flat_id: int,
+    ) -> None:
+        """
+        Recalculates occupancy_status for a flat based on linked approved residents:
+        - If any active resident is TENANT -> TENANT_OCCUPIED
+        - Else if any active resident is OWNER -> OWNER_OCCUPIED
+        - Else (no active registered owner or tenant) -> VACANT
+        """
+        update_occupancy_query: str = (
+            "UPDATE flats f "
+            "LEFT JOIN ( "
+            "    SELECT "
+            "        flat_id, "
+            "        SUM(CASE WHEN resident_type IN ('TENANT', 'TENANT_FAMILY') THEN 1 ELSE 0 END) AS tenant_count, "
+            "        SUM(CASE WHEN resident_type IN ('OWNER', 'OWNER_FAMILY') THEN 1 ELSE 0 END) AS owner_count "
+            "    FROM users "
+            "    WHERE flat_id = %s AND user_role = 'RESIDENT' AND is_active = TRUE "
+            "    GROUP BY flat_id "
+            ") u ON f.flat_id = u.flat_id "
+            "SET f.occupancy_status = CASE "
+            "    WHEN u.tenant_count > 0 THEN 'TENANT_OCCUPIED' "
+            "    WHEN u.owner_count > 0 THEN 'OWNER_OCCUPIED' "
+            "    ELSE 'VACANT' "
+            "END "
+            "WHERE f.flat_id = %s"
+        )
+        database_cursor.execute(update_occupancy_query, (flat_id, flat_id))
+
     # -------------------------------------------------------------------------
     # RESIDENTS DIRECTORY
     # -------------------------------------------------------------------------
@@ -317,7 +364,7 @@ class SocietyTopologyAndUserRepository:
     ) -> List[Dict[str, Any]]:
         select_residents_query: str = (
             "SELECT u.user_id, u.society_id, u.flat_id, u.full_name, u.phone_number, "
-            "u.user_role, u.resident_type, u.approval_status, u.is_active, u.created_at, "
+            "u.user_role, u.resident_type, u.relationship_type, u.approval_status, u.is_active, u.created_at, "
             "f.flat_number, w.wing_name "
             "FROM users u "
             "LEFT JOIN flats f ON u.flat_id = f.flat_id "
@@ -326,6 +373,28 @@ class SocietyTopologyAndUserRepository:
             "ORDER BY w.wing_name ASC, f.flat_number ASC, u.full_name ASC"
         )
         database_cursor.execute(select_residents_query, (society_id,))
+        return database_cursor.fetchall()
+
+    def get_active_flat_members_for_society(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+    ) -> List[Dict[str, Any]]:
+        select_members_query: str = (
+            "SELECT u.user_id, u.society_id, u.flat_id, u.full_name, u.phone_number, "
+            "u.user_role, u.resident_type, u.relationship_type, u.approval_status "
+            "FROM users u "
+            "WHERE u.society_id = %s AND u.user_role = 'RESIDENT' AND u.is_active = TRUE "
+            "ORDER BY u.flat_id ASC, "
+            "CASE u.resident_type "
+            "    WHEN 'OWNER' THEN 1 "
+            "    WHEN 'OWNER_FAMILY' THEN 2 "
+            "    WHEN 'TENANT' THEN 3 "
+            "    WHEN 'TENANT_FAMILY' THEN 4 "
+            "    ELSE 5 "
+            "END, u.user_id ASC"
+        )
+        database_cursor.execute(select_members_query, (society_id,))
         return database_cursor.fetchall()
 
     def insert_resident_user(
@@ -388,6 +457,19 @@ class SocietyTopologyAndUserRepository:
             ),
         )
 
+    def update_resident_approval_status(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        user_id: int,
+        approval_status: str,
+    ) -> None:
+        update_status_query: str = (
+            "UPDATE users SET approval_status = %s "
+            "WHERE user_id = %s AND society_id = %s AND user_role = 'RESIDENT'"
+        )
+        database_cursor.execute(update_status_query, (approval_status, user_id, society_id))
+
     def delete_resident_user(
         self,
         database_cursor: DictCursor,
@@ -399,6 +481,86 @@ class SocietyTopologyAndUserRepository:
             "WHERE user_id = %s AND society_id = %s AND user_role = 'RESIDENT'"
         )
         database_cursor.execute(delete_user_query, (user_id, society_id))
+
+    # -------------------------------------------------------------------------
+    # RESIDENT VERIFICATION DOCUMENTS
+    # -------------------------------------------------------------------------
+
+    def get_documents_for_resident(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        user_id: int,
+    ) -> List[Dict[str, Any]]:
+        select_documents_query: str = (
+            "SELECT document_id, society_id, user_id, document_type, document_title, "
+            "file_name, file_path_or_url, file_size_bytes, uploaded_by_user_id, created_at "
+            "FROM resident_verification_documents "
+            "WHERE society_id = %s AND user_id = %s "
+            "ORDER BY created_at ASC, document_id ASC"
+        )
+        database_cursor.execute(select_documents_query, (society_id, user_id))
+        return database_cursor.fetchall()
+
+    def get_all_documents_for_society_residents(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+    ) -> List[Dict[str, Any]]:
+        select_all_query: str = (
+            "SELECT document_id, society_id, user_id, document_type, document_title, "
+            "file_name, file_path_or_url, file_size_bytes, uploaded_by_user_id, created_at "
+            "FROM resident_verification_documents "
+            "WHERE society_id = %s "
+            "ORDER BY user_id ASC, created_at ASC"
+        )
+        database_cursor.execute(select_all_query, (society_id,))
+        return database_cursor.fetchall()
+
+    def insert_resident_document(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        user_id: int,
+        document_type: str,
+        document_title: str,
+        file_name: str,
+        file_path_or_url: str,
+        file_size_bytes: Optional[int] = None,
+        uploaded_by_user_id: Optional[int] = None,
+    ) -> int:
+        insert_query: str = (
+            "INSERT INTO resident_verification_documents ("
+            "society_id, user_id, document_type, document_title, "
+            "file_name, file_path_or_url, file_size_bytes, uploaded_by_user_id"
+            ") VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        )
+        database_cursor.execute(
+            insert_query,
+            (
+                society_id,
+                user_id,
+                document_type,
+                document_title,
+                file_name,
+                file_path_or_url,
+                file_size_bytes,
+                uploaded_by_user_id,
+            ),
+        )
+        return database_cursor.lastrowid
+
+    def delete_resident_document(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        document_id: int,
+    ) -> None:
+        delete_query: str = (
+            "DELETE FROM resident_verification_documents "
+            "WHERE document_id = %s AND society_id = %s"
+        )
+        database_cursor.execute(delete_query, (document_id, society_id))
 
     # -------------------------------------------------------------------------
     # GATES & SECURITY GUARDS SETUP
@@ -604,7 +766,7 @@ class SocietyTopologyAndUserRepository:
         active_visitors_query: str = (
             "SELECT COUNT(*) AS active_campus_visitors_count FROM visit_logs "
             "WHERE society_id = %s AND exit_timestamp IS NULL "
-            "AND approval_status IN ('APPROVED_ENTRY', 'INSIDE_CAMPUS')"
+            "AND approval_status IN ('APPROVED', 'AUTO_PREAPPROVED', 'INSIDE_CAMPUS', 'APPROVED_ENTRY')"
         )
         database_cursor.execute(active_visitors_query, (society_id,))
         active_visitors_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
@@ -616,6 +778,144 @@ class SocietyTopologyAndUserRepository:
         database_cursor.execute(notices_query, (society_id,))
         notices_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
 
+        # Pending resident approvals count
+        pending_approvals_query: str = (
+            "SELECT COUNT(*) AS pending_approvals_count FROM users "
+            "WHERE society_id = %s AND user_role = 'RESIDENT' AND approval_status = 'PENDING'"
+        )
+        database_cursor.execute(pending_approvals_query, (society_id,))
+        pending_approvals_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Open helpdesk complaints count
+        open_tickets_query: str = (
+            "SELECT COUNT(*) AS open_helpdesk_tickets_count FROM helpdesk_tickets "
+            "WHERE society_id = %s AND status NOT IN ('RESOLVED', 'CLOSED')"
+        )
+        database_cursor.execute(open_tickets_query, (society_id,))
+        open_tickets_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Daily staff active & on campus count
+        staff_query: str = (
+            "SELECT "
+            "COUNT(DISTINCT staff_id) AS total_active_staff_count "
+            "FROM society_daily_staff WHERE society_id = %s AND status = 'ACTIVE'"
+        )
+        database_cursor.execute(staff_query, (str(society_id),))
+        staff_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        staff_on_campus_query: str = (
+            "SELECT COUNT(DISTINCT staff_id) AS staff_on_campus_count FROM society_staff_attendance_logs "
+            "WHERE society_id = %s AND exit_timestamp IS NULL"
+        )
+        database_cursor.execute(staff_on_campus_query, (str(society_id),))
+        staff_on_campus_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Financial billing & maintenance metrics
+        billing_query: str = (
+            "SELECT "
+            "COALESCE(SUM(total_invoice_amount_inr), 0) AS total_billed_amount_inr, "
+            "COALESCE(SUM(paid_amount_inr), 0) AS total_collected_amount_inr, "
+            "COALESCE(SUM(outstanding_balance_inr), 0) AS total_due_amount_inr, "
+            "COUNT(CASE WHEN payment_status = 'OVERDUE' THEN 1 END) AS overdue_invoices_count, "
+            "COUNT(CASE WHEN payment_status = 'PAID' THEN 1 END) AS paid_invoices_count, "
+            "COUNT(*) AS total_invoices_count "
+            "FROM flat_invoices WHERE society_id = %s"
+        )
+        database_cursor.execute(billing_query, (society_id,))
+        billing_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Society Expense Vouchers & Accounts Payable metrics
+        expense_summary_query: str = (
+            "SELECT "
+            "COUNT(*) AS total_expense_vouchers_count, "
+            "COALESCE(SUM(gross_amount_inr), 0) AS total_expenses_amount_inr, "
+            "COALESCE(SUM(CASE WHEN payment_status = 'PAID' THEN net_payable_amount_inr ELSE 0 END), 0) AS paid_expenses_amount_inr, "
+            "COALESCE(SUM(CASE WHEN payment_status != 'PAID' THEN net_payable_amount_inr ELSE 0 END), 0) AS pending_expenses_amount_inr "
+            "FROM society_expense_vouchers "
+            "WHERE society_id = %s"
+        )
+        database_cursor.execute(expense_summary_query, (str(society_id),))
+        expense_metrics: Dict[str, Any] = database_cursor.fetchone() or {}
+
+        # Top Expense Categories breakdown
+        expense_heads_query: str = (
+            "SELECT "
+            "h.head_name, h.category_code, "
+            "COALESCE(SUM(v.gross_amount_inr), 0) AS head_total_inr "
+            "FROM society_expense_vouchers v "
+            "JOIN society_expense_heads h ON v.expense_head_id = h.expense_head_id "
+            "WHERE v.society_id = %s "
+            "GROUP BY h.expense_head_id, h.head_name, h.category_code "
+            "ORDER BY head_total_inr DESC LIMIT 4"
+        )
+        database_cursor.execute(expense_heads_query, (str(society_id),))
+        top_expense_categories: List[Dict[str, Any]] = database_cursor.fetchall() or []
+
+        # Recent Expense Vouchers (latest 4)
+        recent_vouchers_query: str = (
+            "SELECT "
+            "v.voucher_id, v.voucher_number, v.voucher_date, v.gross_amount_inr, "
+            "v.net_payable_amount_inr, v.payment_mode, v.payment_status, "
+            "ven.vendor_name, h.head_name "
+            "FROM society_expense_vouchers v "
+            "LEFT JOIN society_vendors ven ON v.vendor_id = ven.vendor_id "
+            "LEFT JOIN society_expense_heads h ON v.expense_head_id = h.expense_head_id "
+            "WHERE v.society_id = %s "
+            "ORDER BY v.voucher_date DESC, v.voucher_id DESC LIMIT 4"
+        )
+        database_cursor.execute(recent_vouchers_query, (str(society_id),))
+        recent_expense_vouchers: List[Dict[str, Any]] = database_cursor.fetchall() or []
+
+        # Top Overdue Maintenance Invoices (flats with highest pending dues)
+        overdue_invoices_query: str = (
+            "SELECT "
+            "i.invoice_id, i.invoice_number, i.billing_period_label, "
+            "i.total_invoice_amount_inr, i.paid_amount_inr, i.outstanding_balance_inr, "
+            "i.payment_status, i.due_date, "
+            "f.flat_number, w.wing_name "
+            "FROM flat_invoices i "
+            "JOIN flats f ON i.flat_id = f.flat_id "
+            "JOIN wings w ON f.wing_id = w.wing_id "
+            "WHERE i.society_id = %s AND i.outstanding_balance_inr > 0 "
+            "ORDER BY i.outstanding_balance_inr DESC, i.invoice_id ASC LIMIT 4"
+        )
+        database_cursor.execute(overdue_invoices_query, (society_id,))
+        top_overdue_invoices: List[Dict[str, Any]] = database_cursor.fetchall() or []
+
+        # Recent campus visitor activity (latest 5)
+        recent_visitors_query: str = (
+            "SELECT vl.visit_log_id, vl.visitor_full_name, vl.visitor_phone_number, "
+            "vl.visitor_category, vl.company_brand_name, vl.vehicle_registration_number, "
+            "vl.approval_status, vl.entry_timestamp, vl.exit_timestamp, "
+            "f.flat_number, w.wing_name "
+            "FROM visit_logs vl "
+            "LEFT JOIN flats f ON vl.flat_id = f.flat_id "
+            "LEFT JOIN wings w ON f.wing_id = w.wing_id "
+            "WHERE vl.society_id = %s "
+            "ORDER BY vl.visit_log_id DESC LIMIT 5"
+        )
+        database_cursor.execute(recent_visitors_query, (society_id,))
+        recent_visitor_records = database_cursor.fetchall() or []
+
+        # High-priority / active helpdesk tickets (latest 4)
+        recent_tickets_query: str = (
+            "SELECT ticket_id, ticket_number, title, priority, status, wing_name, flat_number, created_at "
+            "FROM helpdesk_tickets WHERE society_id = %s "
+            "ORDER BY CASE priority WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, ticket_id DESC "
+            "LIMIT 4"
+        )
+        database_cursor.execute(recent_tickets_query, (society_id,))
+        recent_ticket_records = database_cursor.fetchall() or []
+
+        # Recent notices (latest 3)
+        recent_notices_query: str = (
+            "SELECT notice_id, notice_title, notice_body_content, created_at "
+            "FROM notices WHERE society_id = %s "
+            "ORDER BY notice_id DESC LIMIT 3"
+        )
+        database_cursor.execute(recent_notices_query, (society_id,))
+        recent_notice_records = database_cursor.fetchall() or []
+
         return {
             "total_flats_count": int(flats_metrics.get("total_flats_count") or 0),
             "owner_occupied_count": int(flats_metrics.get("owner_occupied_count") or 0),
@@ -626,6 +926,26 @@ class SocietyTopologyAndUserRepository:
             "total_gates_count": int(gates_metrics.get("total_gates_count") or 0),
             "active_campus_visitors_count": int(active_visitors_metrics.get("active_campus_visitors_count") or 0),
             "total_notices_count": int(notices_metrics.get("total_notices_count") or 0),
+            "pending_approvals_count": int(pending_approvals_metrics.get("pending_approvals_count") or 0),
+            "open_helpdesk_tickets_count": int(open_tickets_metrics.get("open_helpdesk_tickets_count") or 0),
+            "total_active_staff_count": int(staff_metrics.get("total_active_staff_count") or 0),
+            "staff_on_campus_count": int(staff_on_campus_metrics.get("staff_on_campus_count") or 0),
+            "total_billed_amount_inr": float(billing_metrics.get("total_billed_amount_inr") or 0.0),
+            "total_collected_amount_inr": float(billing_metrics.get("total_collected_amount_inr") or 0.0),
+            "total_due_amount_inr": float(billing_metrics.get("total_due_amount_inr") or 0.0),
+            "overdue_invoices_count": int(billing_metrics.get("overdue_invoices_count") or 0),
+            "paid_invoices_count": int(billing_metrics.get("paid_invoices_count") or 0),
+            "total_invoices_count": int(billing_metrics.get("total_invoices_count") or 0),
+            "total_expenses_amount_inr": float(expense_metrics.get("total_expenses_amount_inr") or 0.0),
+            "paid_expenses_amount_inr": float(expense_metrics.get("paid_expenses_amount_inr") or 0.0),
+            "pending_expenses_amount_inr": float(expense_metrics.get("pending_expenses_amount_inr") or 0.0),
+            "total_expense_vouchers_count": int(expense_metrics.get("total_expense_vouchers_count") or 0),
+            "top_expense_categories": top_expense_categories,
+            "recent_expense_vouchers": recent_expense_vouchers,
+            "top_overdue_invoices": top_overdue_invoices,
+            "recent_visitors": recent_visitor_records,
+            "recent_tickets": recent_ticket_records,
+            "recent_notices": recent_notice_records,
         }
 
     # -------------------------------------------------------------------------
@@ -671,3 +991,109 @@ class SocietyTopologyAndUserRepository:
             ),
         )
         return database_cursor.lastrowid
+
+    # -------------------------------------------------------------------------
+    # FLAT OWNERSHIP TRANSFERS & HISTORICAL AUDIT
+    # -------------------------------------------------------------------------
+
+    def insert_flat_ownership_history(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+        previous_owner_user_id: Optional[int],
+        previous_owner_name: str,
+        previous_owner_phone: Optional[str],
+        new_owner_user_id: Optional[int],
+        new_owner_name: str,
+        new_owner_phone: str,
+        transfer_sale_date: str,
+        sale_deed_document_url: Optional[str] = None,
+        sale_deed_document_filename: Optional[str] = None,
+        transfer_remarks: Optional[str] = None,
+        transfer_fee_inr: float = 0.0,
+        fee_category: str = "SOCIETY_TRANSFER_FEE",
+        society_development_fund_inr: float = 0.0,
+        payment_mode: str = "NEFT_RTGS",
+        payment_reference_number: Optional[str] = None,
+        recorded_by_admin_user_id: Optional[int] = None,
+    ) -> int:
+        insert_history_query: str = (
+            "INSERT INTO flat_ownership_history ("
+            "society_id, flat_id, previous_owner_user_id, previous_owner_name, "
+            "previous_owner_phone, new_owner_user_id, new_owner_name, new_owner_phone, "
+            "transfer_sale_date, sale_deed_document_url, sale_deed_document_filename, "
+            "transfer_remarks, transfer_fee_inr, fee_category, society_development_fund_inr, "
+            "payment_mode, payment_reference_number, recorded_by_admin_user_id"
+            ") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        )
+        database_cursor.execute(
+            insert_history_query,
+            (
+                society_id,
+                flat_id,
+                previous_owner_user_id,
+                previous_owner_name,
+                previous_owner_phone,
+                new_owner_user_id,
+                new_owner_name,
+                new_owner_phone,
+                transfer_sale_date,
+                sale_deed_document_url,
+                sale_deed_document_filename,
+                transfer_remarks,
+                transfer_fee_inr,
+                fee_category,
+                society_development_fund_inr,
+                payment_mode,
+                payment_reference_number,
+                recorded_by_admin_user_id,
+            ),
+        )
+        return database_cursor.lastrowid
+
+    def get_ownership_history_for_flat(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+    ) -> List[Dict[str, Any]]:
+        select_history_query: str = (
+            "SELECT h.history_id, h.society_id, h.flat_id, h.previous_owner_user_id, "
+            "h.previous_owner_name, h.previous_owner_phone, h.new_owner_user_id, "
+            "h.new_owner_name, h.new_owner_phone, h.transfer_sale_date, "
+            "h.sale_deed_document_url, h.sale_deed_document_filename, "
+            "h.transfer_remarks, h.transfer_fee_inr, h.fee_category, "
+            "h.society_development_fund_inr, h.payment_mode, h.payment_reference_number, "
+            "h.recorded_by_admin_user_id, h.created_at, u.full_name AS admin_recorder_name "
+            "FROM flat_ownership_history h "
+            "LEFT JOIN users u ON h.recorded_by_admin_user_id = u.user_id "
+            "WHERE h.society_id = %s AND h.flat_id = %s "
+            "ORDER BY h.transfer_sale_date DESC, h.history_id DESC"
+        )
+        database_cursor.execute(select_history_query, (society_id, flat_id))
+        return database_cursor.fetchall()
+
+    def deactivate_owner_and_family_members(
+        self,
+        database_cursor: DictCursor,
+        society_id: int,
+        flat_id: int,
+        new_owner_user_id: int,
+    ) -> int:
+        """
+        Marks all previous active owners and their family members for the flat as PAST_OWNER and inactive,
+        except the newly assigned owner.
+        """
+        update_users_query: str = (
+            "UPDATE users SET "
+            "resident_type = 'PAST_OWNER', "
+            "is_active = FALSE "
+            "WHERE society_id = %s AND flat_id = %s AND user_id != %s AND ("
+            "resident_type IN ('OWNER', 'OWNER_FAMILY', 'FAMILY_MEMBER')"
+            ")"
+        )
+        database_cursor.execute(
+            update_users_query, (society_id, flat_id, new_owner_user_id)
+        )
+        return database_cursor.rowcount

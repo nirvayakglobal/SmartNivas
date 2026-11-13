@@ -28,6 +28,7 @@ import { UnifiedPortalLoginPage } from "./sub_modules/auth/UnifiedPortalLoginPag
 
 import {
   Users,
+  Building,
   Building2,
   CreditCard,
   FileSpreadsheet,
@@ -92,18 +93,13 @@ export function DesktopApplicationRouter() {
   const societyAdminNavigationItems = [
     {
       targetPath: "/Society/Admin/dashboard",
-      displayLabel: "Command Center",
+      displayLabel: "Dashboard",
       iconComponent: LayoutDashboard,
     },
     {
-      targetPath: "/Society/Admin/topology",
-      displayLabel: "Wings & Flat Directory",
-      iconComponent: Layers,
-    },
-    {
       targetPath: "/Society/Admin/residents",
-      displayLabel: "Resident Directory & CSV",
-      iconComponent: Users,
+      displayLabel: "Wings, Flats & Residents",
+      iconComponent: Building,
     },
     {
       targetPath: "/Society/Admin/gates",
@@ -117,7 +113,7 @@ export function DesktopApplicationRouter() {
     },
     {
       targetPath: "/Society/Admin/billing",
-      displayLabel: "Maintenance & Billing",
+      displayLabel: "Maintenance & Income",
       iconComponent: IndianRupee,
     },
     {
@@ -251,7 +247,8 @@ export function DesktopApplicationRouter() {
           >
             <Routes>
               <Route path="dashboard" element={<SocietyDashboardOverviewPage />} />
-              <Route path="topology" element={<WingAndFlatBulkGeneratorPage />} />
+              <Route path="wings-and-flats" element={<Navigate to="/Society/Admin/residents?tab=WINGS_AND_FLATS" replace />} />
+              <Route path="topology" element={<Navigate to="/Society/Admin/residents?tab=WINGS_AND_FLATS" replace />} />
               <Route
                 path="residents"
                 element={<ResidentDirectoryAndCsvImportPage />}

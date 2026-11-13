@@ -12,6 +12,7 @@ export function EditFlatClassificationModal({
   isOpen,
   onClose,
   flat,
+  availableCategories = [],
   onSaved,
 }) {
   if (!isOpen || !flat) return null;
@@ -22,6 +23,19 @@ export function EditFlatClassificationModal({
   );
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const combinedCategories = Array.from(
+    new Set([
+      "REGULAR",
+      "PENTHOUSE",
+      "2BHK",
+      "3BHK",
+      "4BHK",
+      "SHOP",
+      ...(availableCategories || []),
+      flat.flat_type,
+    ].filter(Boolean))
+  );
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -56,10 +70,16 @@ export function EditFlatClassificationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="backdrop-blur-2xl bg-white/95 border border-slate-200/90 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-900 font-heading">
               Edit Flat Classification
@@ -70,7 +90,7 @@ export function EditFlatClassificationModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition cursor-pointer"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -91,14 +111,13 @@ export function EditFlatClassificationModal({
             <select
               value={flatType}
               onChange={(e) => setFlatType(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-600 font-semibold"
+              className="w-full px-3 py-2 text-xs border border-slate-200/90 rounded-xl bg-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 font-semibold"
             >
-              <option value="REGULAR">REGULAR (Standard Apartment)</option>
-              <option value="PENTHOUSE">PENTHOUSE (Top Floor Luxury)</option>
-              <option value="2BHK">2BHK</option>
-              <option value="3BHK">3BHK</option>
-              <option value="4BHK">4BHK</option>
-              <option value="SHOP">SHOP / Commercial Unit</option>
+              {combinedCategories.map((catKey) => (
+                <option key={catKey} value={catKey}>
+                  {catKey} {catKey === "REGULAR" ? "(Standard Apartment)" : catKey === "PENTHOUSE" ? "(Top Floor Luxury)" : ""}
+                </option>
+              ))}
             </select>
           </div>
 
